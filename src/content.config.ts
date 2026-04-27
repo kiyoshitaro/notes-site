@@ -1,20 +1,54 @@
-import { defineCollection } from 'astro:content';
-import { glob } from 'astro/loaders';
-import { z } from 'astro/zod';
+import { defineCollection, z } from "astro:content";
+import { glob } from "astro/loaders";
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD dates");
+
+const requireDescriptionWhenPublished =
+  (label: string) =>
+  (
+    data: { published?: boolean; description?: string },
+    ctx: z.RefinementCtx,
+  ) => {
+    if (data.published && !data.description?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Published ${label} must include a description for SEO.`,
+        path: ["description"],
+      });
+    }
+  };
 
 const blog = defineCollection({
-	// Load Markdown and MDX files in the `src/content/blog/` directory.
-	loader: glob({ base: './src/content/blog', pattern: '**/*.{md,mdx}' }),
-	// Type-check frontmatter using a schema
-	schema: ({ image }) =>
-		z.object({
-			title: z.string(),
-			description: z.string(),
-			// Transform string to Date object
-			pubDate: z.coerce.date(),
-			updatedDate: z.coerce.date().optional(),
-			heroImage: z.optional(image()),
-		}),
+  loader: glob({ pattern: "**/*.md", base: "./src/content/blog" }),
+  schema: z
+    .object({
+      title: z.string(),
+      pubDate: isoDate,
+      updatedDate: isoDate.optional(),
+      published: z.boolean().optional().default(true),
+      description: z.string().min(1).optional(),
+      cat: z.string().optional(),
+      useKatex: z.boolean().optional().default(false),
+    })
+    .superRefine(requireDescriptionWhenPublished("posts")),
 });
 
-export const collections = { blog };
+const books = defineCollection({
+  loader: glob({
+    pattern: "**/*.md",
+    base: "./src/content/books",
+    ignore: ["**/CLAUDE.md"],
+  }),
+  schema: z
+    .object({
+      title: z.string(),
+      pubDate: isoDate,
+      updatedDate: isoDate.optional(),
+      published: z.boolean().optional().default(true),
+      description: z.string().min(1).optional(),
+      useKatex: z.boolean().optional().default(false),
+    })
+    .superRefine(requireDescriptionWhenPublished("documents")),
+});
+
+export const collections = { blog, books };

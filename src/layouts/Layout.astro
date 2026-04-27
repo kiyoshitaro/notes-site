@@ -1,0 +1,588 @@
+---
+const isHome = Astro.url.pathname === '/';
+const {
+  title = 'ml, bio, coding',
+  description = 'thoughts on neural nets, chips, and cells',
+  ogType = 'website',
+  schemaArticle,
+  schema,
+  favoriteSong,
+  robots = 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1',
+  useKatex = false,
+  ogImage,
+  fullBleed = false,
+  hideBackLink = false,
+} = Astro.props;
+
+const siteName = 'hungnt';
+const siteHandle = '@kiyoshitaro';
+const authorName = 'Hung T.Nguyen';
+
+// Parse song title and artist if in format "title — artist"
+const songParts = favoriteSong?.title?.split('—').map(part => part.trim());
+const songTitle = songParts?.[0] || favoriteSong?.title || '';
+const songArtist = songParts?.[1] || '';
+const fullTitle = title;
+const cleanPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
+const canonicalUrl = Astro.site ? new URL(cleanPath, Astro.site).toString() : Astro.url.toString();
+const siteUrl = Astro.site ? new URL('/', Astro.site).toString() : canonicalUrl;
+const ogImageUrl = ogImage
+  ? (Astro.site ? new URL(ogImage, Astro.site).toString() : ogImage)
+  : (Astro.site ? new URL('/favicon.ico', Astro.site).toString() : '/favicon.ico');
+const twitterCard = ogImage ? 'summary_large_image' : 'summary';
+const extraSchemas = Array.isArray(schema) ? schema : schema ? [schema] : [];
+const personSchema = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "@id": `${siteUrl}#person`,
+  "name": authorName,
+  "url": siteUrl,
+  "sameAs": [
+    "https://github.com/kiyoshitaro",
+    "https://twitter.com/kiyoshitaro"
+  ],
+  "jobTitle": "Software Engineer"
+};
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": `${siteUrl}#website`,
+  "name": siteName,
+  "url": siteUrl,
+  "publisher": { "@id": `${siteUrl}#person` }
+};
+const pageSchema = {
+  "@context": "https://schema.org",
+  "@type": isHome ? "CollectionPage" : "WebPage",
+  "@id": `${canonicalUrl}#webpage`,
+  "url": canonicalUrl,
+  "name": fullTitle,
+  "description": description,
+  "inLanguage": "en-US",
+  "isPartOf": { "@id": `${siteUrl}#website` },
+  "about": { "@id": `${siteUrl}#person` }
+};
+let articleSchema = schemaArticle ? {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": schemaArticle.title,
+  "description": schemaArticle.description,
+  "datePublished": schemaArticle.publishedTime,
+  "dateModified": schemaArticle.updatedTime ?? schemaArticle.publishedTime,
+  "mainEntityOfPage": { "@type": "WebPage", "@id": canonicalUrl },
+  "author": { "@id": `${siteUrl}#person` },
+  "publisher": {
+    "@type": "Person",
+    "name": authorName,
+    "url": siteUrl
+  },
+  "inLanguage": "en-US",
+  "isPartOf": { "@id": `${siteUrl}#website` }
+} : null;
+if (articleSchema && schemaArticle?.imageUrl) {
+  articleSchema = { ...articleSchema, image: [schemaArticle.imageUrl] };
+}
+if (articleSchema && schemaArticle?.section) {
+  articleSchema = { ...articleSchema, articleSection: schemaArticle.section };
+}
+if (articleSchema && schemaArticle?.wordCount) {
+  articleSchema = { ...articleSchema, wordCount: schemaArticle.wordCount };
+}
+---
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <meta name="author" content={authorName} />
+  <meta name="robots" content={robots} />
+
+  <title>{fullTitle}</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <link rel="preload" href="/fonts/GoogleSansCode-Variable.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/fonts/GoogleSansCode-VariableItalic.woff2" as="font" type="font/woff2" crossorigin />
+  {useKatex && <link rel="stylesheet" href="/katex.min.css" />}
+  <link rel="stylesheet" href="/markdown.css" />
+  <link rel="canonical" href={canonicalUrl} />
+
+  <meta property="og:title" content={fullTitle} />
+  <meta property="og:description" content={description} />
+  <meta property="og:type" content={ogType} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:image" content={ogImageUrl} />
+  <meta property="og:image:alt" content={fullTitle} />
+  {ogImage && <meta property="og:image:width" content="1200" />}
+  {ogImage && <meta property="og:image:height" content="630" />}
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:site_name" content="kiyoshitaro" />
+  {schemaArticle?.publishedTime && <meta property="article:published_time" content={schemaArticle.publishedTime} />}
+  {schemaArticle?.updatedTime && <meta property="article:modified_time" content={schemaArticle.updatedTime} />}
+  {schemaArticle?.section && <meta property="article:section" content={schemaArticle.section} />}
+
+  <meta name="twitter:card" content={twitterCard} />
+  <meta name="twitter:site" content={siteHandle} />
+  <meta name="twitter:creator" content={siteHandle} />
+  <meta name="twitter:title" content={fullTitle} />
+  <meta name="twitter:description" content={description} />
+  <meta name="twitter:image" content={ogImageUrl} />
+  <meta name="twitter:image:alt" content={fullTitle} />
+  {ogType === 'article' && <meta property="article:author" content={authorName} />}
+  <meta name="theme-color" content="#111" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#fff" media="(prefers-color-scheme: light)" />
+
+  <script is:inline>
+    (() => {
+      const storedTheme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = storedTheme === 'light' || storedTheme === 'dark'
+        ? storedTheme
+        : (prefersDark ? 'dark' : 'light');
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+
+<style>
+  @font-face {
+    font-family: "Google Sans Code";
+    font-style: normal;
+    font-weight: 300 800;
+    font-display: swap;
+    src: url("/fonts/GoogleSansCode-Variable.woff2") format("woff2"),
+         url("/fonts/GoogleSansCode-Variable.ttf") format("truetype");
+  }
+
+  @font-face {
+    font-family: "Google Sans Code";
+    font-style: italic;
+    font-weight: 300 800;
+    font-display: swap;
+    src: url("/fonts/GoogleSansCode-VariableItalic.woff2") format("woff2"),
+         url("/fonts/GoogleSansCode-VariableItalic.ttf") format("truetype");
+  }
+
+  :root {
+    --bg: #faf9f7;
+    --fg: #37352f;
+    --fg-strong: #1a1a1a;
+    --fg-soft: #666055;
+    --fg-muted: #888178;
+    --fg-faint: #999188;
+    --fg-subtle: #aaa39b;
+    --accent: #4a7c96;
+    --accent-hover: #3a6580;
+    --accent-rgb: 74, 124, 150;
+    --border-soft: #e8e6e1;
+    --border-muted: #e0ddd8;
+    --border-strong: #d0cdc6;
+    --surface-soft: #f5f3ef;
+    --surface-elev: #f0eeeb;
+    --surface-note: #f7f6f3;
+    --cat-gpu: #3a8a6e;
+    --cat-ml: #c06a20;
+    --cat-hardware: #b85a8a;
+    --cat-bio: #7c6ab8;
+    --cat-misc: #7a8694;
+    --shadow-rgb: 0, 0, 0;
+    --overlay-bg: rgba(0, 0, 0, 0.72);
+    --overlay-control-bg: rgba(0, 0, 0, 0.55);
+    --overlay-control-border: rgba(255, 255, 255, 0.18);
+    --overlay-text: rgba(255, 255, 255, 0.9);
+    --overlay-text-muted: rgba(255, 255, 255, 0.75);
+    --font-size: 16px;
+    --font-sans: Charter, "Bitstream Charter", "Sitka Text", Cambria, serif;
+    --font-mono: "Google Sans Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    color-scheme: light;
+  }
+
+  :root[data-theme='dark'] {
+    --bg: #181818;
+    --fg: #c8c4be;
+    --fg-strong: #e8e5df;
+    --fg-soft: #9a9590;
+    --fg-muted: #7a7570;
+    --fg-faint: #6a6560;
+    --fg-subtle: #5a5550;
+    --accent: #8ab4cc;
+    --accent-hover: #a0c8dd;
+    --accent-rgb: 138, 180, 204;
+    --border-soft: #2a2a28;
+    --border-muted: #333330;
+    --border-strong: #444440;
+    --surface-soft: #1e1e1c;
+    --surface-elev: #242422;
+    --surface-note: #282826;
+    --cat-gpu: #6dba98;
+    --cat-ml: #daa86a;
+    --cat-hardware: #d49ab8;
+    --cat-bio: #a89cd6;
+    --cat-misc: #98a4b0;
+    --shadow-rgb: 8, 8, 6;
+    --overlay-bg: rgba(12, 12, 10, 0.8);
+    --overlay-control-bg: rgba(22, 22, 20, 0.72);
+    --overlay-control-border: rgba(200, 196, 190, 0.2);
+    --overlay-text: rgba(232, 229, 223, 0.94);
+    --overlay-text-muted: rgba(200, 196, 190, 0.75);
+    color-scheme: dark;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    font-size: var(--font-size);
+    transition: background-color 0.42s ease, color 0.42s ease;
+  }
+
+  html.theme-changing,
+  html.theme-changing * {
+    transition-property: color, background-color, border-color, box-shadow, text-shadow, fill, stroke;
+    transition-duration: 0.42s;
+    transition-timing-function: ease;
+  }
+
+  code, pre, kbd, samp {
+    font-family: var(--font-mono);
+  }
+
+  .site-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem clamp(1rem, 4vw, 2rem);
+    box-sizing: border-box;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    font-family: var(--font-mono);
+  }
+
+  .site-header.full-bleed {
+    max-width: none;
+    margin: 0;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .home-song {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    color: var(--fg-faint);
+    text-decoration: none;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    background: var(--surface-soft);
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .home-song:hover {
+    color: var(--fg);
+    border-color: var(--accent);
+    background: var(--surface-note);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.12);
+  }
+
+  .home-song::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(var(--accent-rgb), 0.05), transparent);
+    transition: left 0.6s ease;
+  }
+
+  .home-song:hover::before {
+    left: 100%;
+  }
+
+  .song-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .song-icon svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    animation: none;
+    transition: transform 0.4s ease;
+  }
+
+  .home-song:hover .song-icon svg {
+    animation: spin 2s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .song-icon::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--border-muted);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .home-song:hover .song-icon::after {
+    opacity: 1;
+  }
+
+  .song-title {
+    color: var(--fg-soft);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: color 0.25s ease;
+  }
+
+  .song-artist {
+    color: var(--fg-subtle);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0;
+    max-width: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .home-song:hover .song-artist {
+    opacity: 1;
+    max-width: 200px;
+    margin-left: 0.3rem;
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--border-muted);
+  }
+
+  .site-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin: 0;
+    text-transform: lowercase;
+    letter-spacing: 0.1em;
+  }
+
+  .site-title a {
+    color: var(--fg);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .site-title a:hover {
+    text-decoration: none;
+  }
+
+  .site-title a:hover .site-label {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .site-title a .arrow {
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1em;
+    line-height: 1;
+    color: var(--fg-subtle);
+  }
+
+  nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+  }
+
+  nav a {
+    color: var(--fg-muted);
+    text-decoration: none;
+    font-size: 0.82rem;
+    padding: 0.35rem 0.6rem;
+    text-transform: lowercase;
+    letter-spacing: 0.05em;
+  }
+
+  nav a:hover {
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+
+  .theme-toggle {
+    border: none;
+    background: none;
+    color: var(--fg-muted);
+    font-size: 0.82rem;
+    line-height: 1;
+    padding: 0.35rem 0.3rem;
+    cursor: pointer;
+    display: inline-grid;
+    place-items: center;
+    transition: color 0.42s ease;
+  }
+
+  .theme-toggle:hover {
+    color: var(--fg);
+  }
+
+  .theme-toggle:focus-visible {
+    outline: 2px solid rgba(var(--accent-rgb), 0.35);
+    outline-offset: 2px;
+  }
+
+  .theme-toggle-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  @media (max-width: 600px) {
+    .home-song {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html,
+    body,
+    html.theme-changing,
+    html.theme-changing *,
+    .song-title,
+    .theme-toggle {
+      transition: none !important;
+    }
+  }
+
+  .page-main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 clamp(1rem, 4vw, 2rem);
+  }
+
+  .page-main.full-bleed {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Blog post pages get slightly different treatment */
+  .page-main:has(.post-content) {
+    padding-bottom: 4rem;
+  }
+
+</style>
+
+  <script type="application/ld+json" set:html={JSON.stringify(personSchema)} />
+  <script type="application/ld+json" set:html={JSON.stringify(websiteSchema)} />
+  <script type="application/ld+json" set:html={JSON.stringify(pageSchema)} />
+  {articleSchema && <script type="application/ld+json" set:html={JSON.stringify(articleSchema)} />}
+  {extraSchemas.map((entry) => (
+    <script type="application/ld+json" set:html={JSON.stringify(entry)} />
+  ))}
+
+</head>
+<body>
+  <header class:list={['site-header', { 'full-bleed': fullBleed }]}>
+    {isHome && favoriteSong && (
+      <a class="home-song" href={favoriteSong.url} target="_blank" aria-label={`Favorite song right now: ${songTitle} by ${songArtist}`}>
+        <span class="song-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="song-title">{songTitle}</span>
+        {songArtist && <span class="song-artist">{songArtist}</span>}
+      </a>
+    )}
+    {!isHome && !hideBackLink && (
+      <div class="site-title">
+        <a href="/">
+          <span class="arrow">&#8592;</span>
+          <span class="site-label">{new URL(siteUrl).hostname}</span>
+        </a>
+      </div>
+    )}
+    {!isHome && hideBackLink && <div class="site-title-spacer" aria-hidden="true"></div>}
+    <nav>
+      <ul>
+        <li>
+          <button
+            type="button"
+            class="theme-toggle"
+            data-theme-toggle
+            aria-label="Switch to dark mode"
+            aria-pressed="false"
+            title="Toggle theme"
+          >
+            <svg class="theme-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18V4a8 8 0 1 1 0 16Z"/>
+            </svg>
+          </button>
+        </li>
+        <li><a href="https://facebook.com/hunglhp1998" target="_blank" rel="noopener noreferrer">@hunglhp1998</a></li>
+        <li><a href="https://github.com/kiyoshitaro" target="_blank" rel="noopener noreferrer">github</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class:list={['page-main', { 'full-bleed': fullBleed }]}>
+    <slot />
+  </main>
+  <script is:inline>
+    (() => {
+      const root = document.documentElement;
+      const button = document.querySelector('[data-theme-toggle]');
+      if (!(button instanceof HTMLButtonElement)) return;
+
+      const setTheme = (theme) => {
+        root.dataset.theme = theme;
+        const label = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', String(theme === 'dark'));
+      };
+
+      // Sync ARIA state with theme set by the head script
+      const initial = root.dataset.theme === 'dark' ? 'dark' : 'light';
+      button.setAttribute('aria-label', initial === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+      button.setAttribute('aria-pressed', String(initial === 'dark'));
+
+      button.addEventListener('click', () => {
+        root.classList.add('theme-changing');
+        const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        setTheme(nextTheme);
+        localStorage.setItem('theme', nextTheme);
+        window.setTimeout(() => root.classList.remove('theme-changing'), 460);
+      });
+    })();
+  </script>
+</body>
+</html>

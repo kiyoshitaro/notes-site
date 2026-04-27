@@ -1,0 +1,361 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
+import BookCard from './BookCard.astro';
+import { getBookConfigs } from '../data/books';
+import { resolveBookFromDocs } from '../lib/books';
+
+interface Props {
+  posts: CollectionEntry<'blog'>[];
+}
+const { posts } = Astro.props as Props;
+
+const bookDocs = await getCollection('books', ({ data }) => data.published);
+const books = getBookConfigs().map((config) => {
+  const resolved = resolveBookFromDocs(config.id, bookDocs);
+  return {
+    id: config.id,
+    name: config.title,
+    description: config.shortDescription ?? config.description,
+    chapterCount: resolved.chapters.length,
+  };
+});
+
+const formatLongDate = (date: Date) => date.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+}).toLowerCase();
+const parseLocalDate = (dateString: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day));
+};
+const formatPostDate = (dateString: string) => {
+  const date = parseLocalDate(dateString);
+  return date ? formatLongDate(date) : dateString;
+};
+
+const latestPostDate = posts.reduce((latest, post) => {
+  const date = parseLocalDate(post.data.pubDate);
+  return date && date > latest ? date : latest;
+}, new Date(0));
+const latestPostLabel = latestPostDate.getTime() ? formatLongDate(latestPostDate) : '—';
+const githubGraphLightSrc = '/images/github-heat-light.svg';
+const githubGraphDarkSrc = '/images/github-heat-dark.svg';
+
+// Category colors (theme-aware CSS variables)
+const catColors: Record<string, string> = {
+  'gpu': 'var(--cat-gpu)',
+  'ml': 'var(--cat-ml)',
+  'hardware': 'var(--cat-hardware)',
+  'bio': 'var(--cat-bio)',
+  'misc': 'var(--cat-misc)',
+};
+const getCatColor = (cat: string) => catColors[cat] || 'var(--fg-soft)';
+
+// Get unique mapped categories
+const categoryCount = new Set(posts.map(p => p.data.cat).filter(Boolean)).size;
+---
+
+<section class="brutalist-home">
+  <h1 class="sr-only">hungnt notes: systems, machine learning, GPUs, biology, reverse engineering, and side projects</h1>
+  <div class="masthead">
+    <div class="github-graph">
+      <img
+        class="github-graph-img"
+        data-github-graph
+        data-light-src={githubGraphLightSrc}
+        data-dark-src={githubGraphDarkSrc}
+        src={githubGraphLightSrc}
+        alt="GitHub contribution graph"
+        loading="lazy"
+      />
+    </div>
+    <div class="meta-block">
+      <span class="meta-item">{posts.length} posts</span>
+      <span class="meta-sep">/</span>
+      <span class="meta-item">{categoryCount} categories</span>
+      <span class="meta-sep">/</span>
+      <span class="meta-item">{books.length} books</span>
+      <span class="meta-sep">/</span>
+      <span class="meta-item">updated {latestPostLabel}</span>
+    </div>
+  </div>
+
+  {books.length > 0 && (
+    <div class="books-section">
+      <div class="section-header">books</div>
+      <div class="books-grid">
+        {books.map((book) => (
+          <BookCard id={book.id} name={book.name} chapterCount={book.chapterCount} description={book.description} />
+        ))}
+      </div>
+    </div>
+  )}
+
+  <div class="index-section">
+    <div class="section-header">index</div>
+    <ol class="post-index">
+      {posts.map((post, idx) => {
+        const indexNum = String(posts.length - idx).padStart(2, '0');
+        const catLabel = post.data.cat ?? '—';
+
+        return (
+          <li class="index-item">
+            <a href={`/blog/${post.id}`} class="index-link">
+              <span class="index-num">{indexNum}</span>
+              <span class="index-title">{post.data.title}</span>
+              <span class="index-meta">
+                <span class="index-cat" style={`color: ${getCatColor(catLabel)}`}>{catLabel}</span>
+                <span class="index-date">{formatPostDate(post.data.pubDate)}</span>
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ol>
+  </div>
+
+  <div class="footer-art" aria-hidden="true">
+    <svg class="footer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      <line x1="9" y1="9" x2="15" y2="9"></line>
+      <line x1="9" y1="13" x2="15" y2="13"></line>
+      <line x1="9" y1="17" x2="11" y2="17"></line>
+    </svg>
+  </div>
+</section>
+
+<style>
+  .brutalist-home {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 1rem 1rem 4rem;
+    font-family: "Google Sans Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .masthead {
+    padding: 0 0 1.25rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .github-graph {
+    margin-bottom: 0.5rem;
+    overflow-x: auto;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 0.45rem;
+  }
+
+  .github-graph-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    opacity: 0.95;
+    transition: opacity 0.24s ease;
+  }
+
+  .meta-block {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--fg-subtle);
+  }
+
+  .meta-sep {
+    color: var(--border-strong);
+  }
+
+  .books-section {
+    padding: 0;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-header {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--fg-subtle);
+    margin-bottom: 0.75rem;
+    text-transform: lowercase;
+  }
+
+  .books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem;
+  }
+
+  @media (max-width: 600px) {
+    .books-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+
+  .index-section {
+    margin-bottom: 3rem;
+  }
+
+  .post-index {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .index-item {
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .index-item:first-child {
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .index-link {
+    display: grid;
+    grid-template-columns: 2.5rem 1fr auto;
+    gap: 1rem;
+    align-items: baseline;
+    padding: 0.75rem 0.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.1s;
+  }
+
+  .index-link:hover {
+    background: rgba(var(--shadow-rgb), 0.12);
+  }
+
+  .index-num {
+    font-size: 0.8rem;
+    color: var(--fg-subtle);
+    font-weight: 600;
+  }
+
+  .index-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--fg);
+    line-height: 1.3;
+  }
+
+  .index-link:hover .index-title {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .index-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.78rem;
+    color: var(--fg-faint);
+    white-space: nowrap;
+  }
+
+  .index-cat {
+    text-transform: lowercase;
+    min-width: 6rem;
+    text-align: right;
+  }
+
+  .index-date {
+    color: var(--fg-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .footer-art {
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.3;
+    transition: opacity 0.3s;
+  }
+
+  .footer-art:hover {
+    opacity: 0.8;
+  }
+
+  .footer-icon {
+    width: 48px;
+    height: 48px;
+    color: var(--fg);
+  }
+
+  @media (max-width: 600px) {
+    .github-graph {
+      display: none;
+    }
+
+    .masthead {
+      padding: 0 0 1rem;
+    }
+
+    .index-link {
+      grid-template-columns: 2rem 1fr;
+      grid-template-rows: auto auto;
+      gap: 0.25rem 0.75rem;
+    }
+
+    .index-num {
+      grid-row: 1 / 3;
+      align-self: start;
+      padding-top: 0.1rem;
+    }
+
+    .index-meta {
+      grid-column: 2;
+      justify-content: flex-start;
+      gap: 1rem;
+    }
+
+    .index-cat {
+      min-width: auto;
+      text-align: left;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>
+
+<script>
+  (() => {
+    const graph = document.querySelector('[data-github-graph]');
+    if (!(graph instanceof HTMLImageElement)) return;
+    const root = document.documentElement;
+    const lightSrc = graph.dataset.lightSrc;
+    const darkSrc = graph.dataset.darkSrc;
+    if (!lightSrc || !darkSrc) return;
+
+    const syncGraphTheme = () => {
+      const nextSrc = root.dataset.theme === 'dark' ? darkSrc : lightSrc;
+      if (graph.src !== nextSrc) graph.src = nextSrc;
+    };
+
+    syncGraphTheme();
+    new MutationObserver(syncGraphTheme).observe(root, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+  })();
+</script>

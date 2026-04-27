@@ -1,0 +1,427 @@
+---
+// layout + content loading
+import Layout from '../../layouts/Layout.astro';
+import { getCollection, render } from 'astro:content';
+import galleryScriptUrl from '../../scripts/gallery.ts?url';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog', ({ data }) => data.published);
+  return posts.map(post => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content, headings } = await render(post);
+const tocHeadings = headings.filter(heading => heading.depth >= 1 && heading.depth <= 3);
+const showTocRail = tocHeadings.length >= 3;
+
+const parseLocalDate = (dateString: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day));
+};
+const parseIsoDate = (dateString?: string) => {
+  if (!dateString) return undefined;
+  const date = new Date(`${dateString}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+const publishedTime = parseIsoDate(post.data.pubDate);
+const updatedTime = parseIsoDate(post.data.updatedDate);
+const pubDate = parseLocalDate(post.data.pubDate);
+const displayDate = pubDate
+  ? pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).toLowerCase()
+  : post.data.pubDate;
+const description = post.data.description ?? 'a short post on something';
+const body = typeof post.body === 'string' ? post.body.trim() : '';
+const wordCount = body ? body.split(/\s+/).length : 0;
+const multiplier = post.data.cat === 'code' ? 1.3 : 1;
+const readingTimeMinutes = Math.max(1, Math.round((wordCount / 200) * multiplier));
+const readingTimeLabel = readingTimeMinutes < 60
+  ? `approx ${readingTimeMinutes}m read`
+  : `approx ${Math.floor(readingTimeMinutes / 60)}h${readingTimeMinutes % 60 ? ` ${readingTimeMinutes % 60}m` : ''} read`;
+const siteUrl = new URL('/', Astro.site).toString();
+---
+<style>
+:root {
+  /* adjust these to taste */
+  --content-max-width: 800px;
+  --side-gutter: 1rem;
+}
+
+/* prevent any accidental overflow */
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* make all code blocks wrap */
+code,
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* body text line height */
+.markdown-body {
+  line-height: 1.8;
+}
+
+/* Post title styling */
+.post-title-main {
+  font-size: 2.1rem;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-family: var(--font-mono);
+  color: var(--fg-strong);
+}
+
+.post-description {
+  color: var(--fg-muted);
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.7;
+  font-family: var(--font-mono);
+}
+
+.post-subline {
+  margin-bottom: 2rem;
+}
+
+.post-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--fg-subtle);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  margin: 0 0 0.6rem;
+}
+
+.post-meta-sep {
+  color: var(--border-strong);
+}
+
+.post-readtime {
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 600px) {
+  .post-subline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .post-meta {
+    flex-wrap: wrap;
+  }
+}
+
+/* --- Sidebar table of contents --- */
+.toc-rail {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+  width: 24px;
+  padding: 1.2rem 0 1.2rem 0.4rem;
+  transition: width 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+  border-radius: 0 8px 8px 0;
+}
+
+.toc-rail:hover {
+  width: 280px;
+  background: var(--bg);
+  box-shadow: 2px 0 16px rgba(var(--shadow-rgb), 0.24);
+  padding: 1.2rem 0.8rem 1.2rem 0.8rem;
+}
+
+.toc-entries {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc-entry {
+  margin: 0;
+}
+
+.toc-entry a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  padding: 0.25rem 0;
+  transition: color 0.15s;
+}
+
+.toc-tick {
+  flex-shrink: 0;
+  height: 2px;
+  background: var(--border-strong);
+  border-radius: 1px;
+  transition: background 0.2s, width 0.2s;
+}
+
+.toc-entry-title .toc-tick { width: 24px; height: 3px; }
+.toc-entry-title .toc-label { font-weight: 700; color: var(--fg); }
+.toc-entry-title { margin-bottom: 0.3rem; }
+
+.toc-d1 .toc-tick { width: 18px; }
+.toc-d2 .toc-tick { width: 11px; }
+.toc-d3 .toc-tick { width: 6px; }
+
+.toc-label {
+  opacity: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--fg-faint);
+  transition: opacity 0.2s ease 0.1s;
+}
+
+.toc-rail:hover .toc-label {
+  opacity: 1;
+}
+
+/* Active heading */
+.toc-entry.toc-active .toc-tick {
+  background: var(--accent);
+}
+
+.toc-entry.toc-active .toc-label {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* Hover on individual items */
+.toc-entry a:hover .toc-label {
+  color: var(--accent);
+}
+
+.toc-entry a:hover .toc-tick {
+  background: var(--accent);
+}
+
+/* Depth indentation (only visible when expanded) */
+.toc-d2 a { padding-left: 0.6rem; }
+.toc-d3 a { padding-left: 1.2rem; }
+
+/* Hidden on mobile/narrow screens */
+@media (max-width: 1024px) {
+  .toc-rail { display: none; }
+}
+
+/* Perfect centering wrapper */
+.centered-wrapper {
+  display: grid;
+  grid-template-columns: minmax(var(--side-gutter), 1fr) min(var(--content-max-width), calc(100% - (var(--side-gutter) * 2))) minmax(var(--side-gutter), 1fr);
+  width: 100%;
+}
+
+.centered-wrapper > * {
+  grid-column: 2;
+}
+
+/* main article container */
+article.post-plain {
+  box-shadow: none;
+  background: none;
+  border: none;
+
+  /* fluid width up to a max, centered */
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 3rem auto;         /* top/bottom breathing room, centered */
+  padding: 0;                /* remove side padding */
+  box-sizing: border-box;
+  
+  /* Apply equal padding left and right for better centering */
+  padding-left: var(--side-gutter);
+  padding-right: var(--side-gutter);
+}
+
+article.post-plain :global(img) {
+  max-width: 600px;
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 1.5rem auto;
+}
+article.post-plain :global(img[width]) {
+  width: auto;
+  max-width: 100%;
+}
+
+/* tweak typography on small screens if you like */
+@media (max-width: 600px) {
+  :root {
+    --side-gutter: 0.1rem;  /* 50% of the original 1rem */
+  }
+  
+  .post-title-main {
+    font-size: 1.8rem;
+    margin-top: 0.5rem;
+  }
+  .post-date-main {
+    font-size: 0.95rem;
+  }
+  
+  /* Better SVG handling for mobile */
+  article.post-plain svg {
+    height: auto !important;  /* Override any inline height */
+    font-size: 12px !important; /* Slightly reduce SVG text size on mobile */
+  }
+}
+</style>
+
+<Layout
+  title={post.data.title}
+  description={description}
+  ogType="article"
+  useKatex={post.data.useKatex}
+  ogImage={`/og/${post.id}.png`}
+  schemaArticle={{
+    title: post.data.title,
+    description,
+    publishedTime,
+    updatedTime,
+    section: post.data.cat,
+    wordCount: wordCount || undefined,
+    imageUrl: new URL(`/og/${post.id}.png`, siteUrl).href,
+  }}
+  schema={{
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "home", "item": siteUrl },
+      { "@type": "ListItem", "position": 2, "name": post.data.title },
+    ],
+  }}
+>
+  {showTocRail && (
+    <nav class="toc-rail" aria-label="Table of contents">
+      <ol class="toc-entries">
+        <li class="toc-entry toc-entry-title" data-target="top">
+          <a href="#">
+            <span class="toc-tick"></span>
+            <span class="toc-label">{post.data.title}</span>
+          </a>
+        </li>
+        {tocHeadings.map(heading => (
+          <li class={`toc-entry toc-d${heading.depth}`} data-target={heading.slug}>
+            <a href={`#${heading.slug}`}>
+              <span class="toc-tick"></span>
+              <span class="toc-label">{heading.text}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )}
+  <div class="centered-wrapper">
+    <article class="post-plain markdown-body">
+      <div class="post-meta">
+        <time datetime={post.data.pubDate}>{displayDate}</time>
+        <span class="post-meta-sep">•</span>
+        <span class="post-readtime">{readingTimeLabel}</span>
+      </div>
+      <h1 class="post-title-main">{post.data.title}</h1>
+      <div class="post-subline">
+        {post.data.description && (
+          <p class="post-description">{post.data.description}</p>
+        )}
+      </div>
+      <Content />
+    </article>
+  </div>
+  <script type="module" src={galleryScriptUrl}></script>
+  <script>
+    const tocEntries = [...document.querySelectorAll('.toc-entry')];
+    if (tocEntries.length) {
+      const topEntry = tocEntries.find((entry) => entry.dataset.target === 'top') ?? null;
+      const sectionItems = tocEntries
+        .map((entry) => {
+          const id = entry.dataset.target;
+          if (!id || id === 'top') return null;
+          const heading = document.getElementById(id);
+          if (!heading) return null;
+          return { id, entry, heading };
+        })
+        .filter(Boolean);
+
+      let active = null;
+      let scheduled = false;
+      let lockUntil = 0;
+
+      const setActive = (entry) => {
+        if (entry === active) return;
+        if (active) active.classList.remove('toc-active');
+        active = entry;
+        if (active) active.classList.add('toc-active');
+      };
+
+      const resolveActiveEntry = () => {
+        if (!sectionItems.length) return topEntry;
+        const scrollTop = window.scrollY;
+        if (scrollTop <= 24) return topEntry;
+
+        let current = topEntry;
+        for (const item of sectionItems) {
+          const headingTop = window.scrollY + item.heading.getBoundingClientRect().top;
+          if (headingTop <= scrollTop + 96) current = item.entry;
+          else break;
+        }
+        return current;
+      };
+
+      const updateActive = () => {
+        scheduled = false;
+        if (Date.now() < lockUntil) return;
+        setActive(resolveActiveEntry());
+      };
+
+      const scheduleUpdate = () => {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(updateActive);
+      };
+
+      window.addEventListener('scroll', scheduleUpdate, { passive: true });
+      window.addEventListener('resize', scheduleUpdate, { passive: true });
+      window.addEventListener('load', scheduleUpdate, { once: true });
+      scheduleUpdate();
+
+      for (const entry of tocEntries) {
+        entry.querySelector('a')?.addEventListener('click', (event) => {
+          const target = entry.dataset.target;
+          if (!target) return;
+
+          event.preventDefault();
+          setActive(entry);
+          lockUntil = Date.now() + 800;
+
+          if (target === 'top') {
+            window.scrollTo({ top: 0 });
+          } else {
+            const heading = document.getElementById(target);
+            if (!heading) return;
+            heading.scrollIntoView({ block: 'start' });
+          }
+        });
+      }
+    }
+  </script>
+</Layout>
