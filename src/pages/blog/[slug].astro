@@ -1,6 +1,7 @@
 ---
 // layout + content loading
 import Layout from '../../layouts/Layout.astro';
+import Comments from '../../components/Comments.astro';
 import { getCollection, render } from 'astro:content';
 import galleryScriptUrl from '../../scripts/gallery.ts?url';
 
@@ -345,6 +346,7 @@ article.post-plain :global(img[width]) {
         )}
       </div>
       <Content />
+      <Comments />
     </article>
   </div>
   <script type="module" src={galleryScriptUrl}></script>

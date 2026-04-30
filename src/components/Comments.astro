@@ -1,0 +1,129 @@
+---
+const repo = import.meta.env.PUBLIC_GISCUS_REPO ?? 'kiyoshitaro/notes-site';
+const repoId = import.meta.env.PUBLIC_GISCUS_REPO_ID ?? '';
+const category = import.meta.env.PUBLIC_GISCUS_CATEGORY ?? 'Comments';
+const categoryId = import.meta.env.PUBLIC_GISCUS_CATEGORY_ID ?? '';
+const configured = Boolean(repoId && categoryId);
+---
+
+<section class="comments-section" aria-label="Comments">
+  <div class="comments-head">
+    <h2 class="comments-heading">Discussion</h2>
+    <p class="comments-hint">
+      Sign in with GitHub to comment or react. Powered by
+      <a href="https://giscus.app" target="_blank" rel="noopener noreferrer">giscus</a>.
+    </p>
+  </div>
+
+  {!configured && (
+    <div class="comments-warning">
+      <strong>Comments not configured.</strong>
+      Run <a href="https://giscus.app" target="_blank" rel="noopener noreferrer">giscus.app</a>
+      to enable Discussions on the repo, then set
+      <code>PUBLIC_GISCUS_REPO_ID</code> and <code>PUBLIC_GISCUS_CATEGORY_ID</code>
+      in your environment (<code>.env</code>) and rebuild.
+    </div>
+  )}
+
+  <div class="giscus" id="giscus-mount"></div>
+</section>
+
+{configured && (
+  <script
+    is:inline
+    define:vars={{ repo, repoId, category, categoryId }}
+  >
+    (() => {
+      const root = document.documentElement;
+      const themeFor = () => (root.dataset.theme === 'dark' ? 'dark_dimmed' : 'light');
+
+      const s = document.createElement('script');
+      s.src = 'https://giscus.app/client.js';
+      s.setAttribute('data-repo', repo);
+      s.setAttribute('data-repo-id', repoId);
+      s.setAttribute('data-category', category);
+      s.setAttribute('data-category-id', categoryId);
+      s.setAttribute('data-mapping', 'pathname');
+      s.setAttribute('data-strict', '0');
+      s.setAttribute('data-reactions-enabled', '1');
+      s.setAttribute('data-emit-metadata', '0');
+      s.setAttribute('data-input-position', 'top');
+      s.setAttribute('data-theme', themeFor());
+      s.setAttribute('data-lang', 'en');
+      s.setAttribute('data-loading', 'lazy');
+      s.setAttribute('crossorigin', 'anonymous');
+      s.async = true;
+      document.getElementById('giscus-mount')?.appendChild(s);
+
+      const observer = new MutationObserver(() => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage(
+          { giscus: { setConfig: { theme: themeFor() } } },
+          'https://giscus.app'
+        );
+      });
+      observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    })();
+  </script>
+)}
+
+<style>
+  .comments-section {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-soft);
+  }
+  .comments-head {
+    margin-bottom: 1.25rem;
+  }
+  .comments-heading {
+    margin: 0 0 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    color: var(--fg-strong);
+    letter-spacing: 0.02em;
+  }
+  .comments-hint {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+  }
+  .comments-hint a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .comments-hint a:hover {
+    text-decoration: underline;
+  }
+  .comments-warning {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid var(--cat-ml);
+    background: var(--surface-note);
+    color: var(--fg);
+    font-size: 0.88rem;
+    font-family: var(--font-mono);
+    border-radius: 0 6px 6px 0;
+    line-height: 1.55;
+  }
+  .comments-warning code {
+    background: var(--surface-elev);
+    padding: 0.05rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.85em;
+  }
+  .comments-warning a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .giscus {
+    margin-top: 0.5rem;
+  }
+  :global(.giscus-frame) {
+    width: 100%;
+    border: none;
+    color-scheme: light;
+  }
+</style>
