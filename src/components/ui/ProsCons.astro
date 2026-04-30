@@ -1,0 +1,116 @@
+---
+export interface Props {
+  pros: string[];
+  cons: string[];
+}
+const { pros = [], cons = [] } = Astro.props;
+---
+
+<div class="ui-proscons">
+  <div class="ui-proscons__col ui-proscons__col--pros">
+    <div class="ui-proscons__head">
+      <span class="ui-proscons__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+      </span>
+      <span>Pros</span>
+    </div>
+    <ul>
+      {pros.map((pro) => (
+        <li>
+          <span class="ui-proscons__bullet" aria-hidden="true">+</span>
+          <span>{pro}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+  <div class="ui-proscons__col ui-proscons__col--cons">
+    <div class="ui-proscons__head">
+      <span class="ui-proscons__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+      </span>
+      <span>Cons</span>
+    </div>
+    <ul>
+      {cons.map((con) => (
+        <li>
+          <span class="ui-proscons__bullet" aria-hidden="true">−</span>
+          <span>{con}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+</div>
+
+<style>
+  .ui-proscons {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+    margin: 2rem 0;
+  }
+  @media (min-width: 720px) {
+    .ui-proscons {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .ui-proscons__col {
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    background: var(--surface-soft);
+  }
+  .ui-proscons__col--pros {
+    border-left: 3px solid var(--cat-gpu);
+  }
+  .ui-proscons__col--cons {
+    border-left: 3px solid var(--cat-hardware);
+  }
+  .ui-proscons__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.7rem;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+  .ui-proscons__col--pros .ui-proscons__head {
+    color: var(--cat-gpu);
+  }
+  .ui-proscons__col--cons .ui-proscons__head {
+    color: var(--cat-hardware);
+  }
+  .ui-proscons__icon {
+    display: inline-flex;
+    line-height: 0;
+  }
+  .ui-proscons ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .ui-proscons li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.18rem 0;
+    color: var(--fg);
+    font-size: 0.94rem;
+    line-height: 1.55;
+  }
+  .ui-proscons__bullet {
+    flex-shrink: 0;
+    width: 1rem;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+  }
+  .ui-proscons__col--pros .ui-proscons__bullet {
+    color: var(--cat-gpu);
+  }
+  .ui-proscons__col--cons .ui-proscons__bullet {
+    color: var(--cat-hardware);
+  }
+</style>

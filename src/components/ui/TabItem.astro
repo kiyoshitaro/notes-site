@@ -1,0 +1,18 @@
+<div class="ui-tab-panel">
+  <slot />
+</div>
+
+<style>
+  .ui-tab-panel {
+    padding: 1rem 1.1rem;
+  }
+  .ui-tab-panel :global(*:first-child) {
+    margin-top: 0;
+  }
+  .ui-tab-panel :global(*:last-child) {
+    margin-bottom: 0;
+  }
+  .ui-tab-panel :global(pre) {
+    margin: 0;
+  }
+</style>

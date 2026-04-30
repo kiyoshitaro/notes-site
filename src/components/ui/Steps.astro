@@ -1,0 +1,45 @@
+<ol class="ui-steps">
+  <slot />
+</ol>
+
+<style>
+  .ui-steps {
+    counter-reset: ui-step;
+    list-style: none;
+    margin: 2rem 0;
+    padding: 0 0 0 1.6rem;
+    border-left: 2px solid var(--border-muted);
+  }
+  .ui-steps :global(> *) {
+    counter-increment: ui-step;
+    position: relative;
+    margin: 0 0 2rem;
+    padding-left: 0.4rem;
+  }
+  .ui-steps :global(> *:last-child) {
+    margin-bottom: 0;
+  }
+  .ui-steps :global(> *::before) {
+    content: counter(ui-step);
+    position: absolute;
+    left: -2.55rem;
+    top: -0.1rem;
+    width: 1.8rem;
+    height: 1.8rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-strong);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+  .ui-steps :global(> * > h3),
+  .ui-steps :global(> * > h2),
+  .ui-steps :global(> * > h4) {
+    margin-top: 0;
+    margin-bottom: 0.4rem;
+  }
+</style>

@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import sitemap from '@astrojs/sitemap';
+import mdx from '@astrojs/mdx';
 import fs from 'node:fs';
 import path from 'node:path';
 import remarkGallery from './scripts/remark-gallery.mjs';
@@ -89,6 +90,7 @@ export default defineConfig({
   trailingSlash: 'never',
   build: { format: 'file' },
   integrations: [
+    mdx(),
     sitemap({
       filter: (page) => {
         const pathname = new URL(page).pathname;

@@ -1,0 +1,104 @@
+---
+export interface Props {
+  tabs: string[];
+}
+const { tabs } = Astro.props;
+---
+
+<div class="ui-tabs">
+  <div class="ui-tabs__triggers" role="tablist">
+    {
+      tabs.map((tab, i) => (
+        <button
+          type="button"
+          class="ui-tabs__trigger"
+          role="tab"
+          aria-selected={i === 0 ? "true" : "false"}
+        >
+          {tab}
+        </button>
+      ))
+    }
+  </div>
+  <div class="ui-tabs__panels">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .ui-tabs {
+    display: block;
+    margin: 1.5rem 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .ui-tabs__triggers {
+    display: flex;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--surface-soft);
+    scrollbar-width: none;
+  }
+  .ui-tabs__triggers::-webkit-scrollbar {
+    display: none;
+  }
+  .ui-tabs__trigger {
+    flex-shrink: 0;
+    padding: 0.6rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s ease;
+  }
+  .ui-tabs__trigger:hover {
+    color: var(--fg);
+  }
+  .ui-tabs__trigger[aria-selected="true"] {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .ui-tabs__trigger[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--accent);
+  }
+  .ui-tabs__panels {
+    background: var(--bg);
+  }
+</style>
+
+<script>
+  function init() {
+    document.querySelectorAll<HTMLElement>(".ui-tabs").forEach((container) => {
+      if (container.dataset.uiTabsReady === "1") return;
+      container.dataset.uiTabsReady = "1";
+      const triggers = container.querySelectorAll<HTMLButtonElement>(".ui-tabs__trigger");
+      const panels = Array.from(
+        container.querySelector(".ui-tabs__panels")?.children ?? []
+      ) as HTMLElement[];
+      panels.forEach((p, i) => {
+        if (i !== 0) p.setAttribute("hidden", "true");
+      });
+      triggers.forEach((trigger, idx) => {
+        trigger.addEventListener("click", () => {
+          triggers.forEach((t) => t.setAttribute("aria-selected", "false"));
+          panels.forEach((p) => p.setAttribute("hidden", "true"));
+          trigger.setAttribute("aria-selected", "true");
+          panels[idx]?.removeAttribute("hidden");
+        });
+      });
+    });
+  }
+  init();
+  document.addEventListener("astro:page-load", init);
+</script>

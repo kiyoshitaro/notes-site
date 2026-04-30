@@ -35,7 +35,7 @@ const blog = defineCollection({
 
 const books = defineCollection({
   loader: glob({
-    pattern: "**/*.md",
+    pattern: "**/*.{md,mdx}",
     base: "./src/content/books",
     ignore: ["**/CLAUDE.md"],
   }),

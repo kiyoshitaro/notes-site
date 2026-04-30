@@ -1,0 +1,79 @@
+---
+const { author, title } = Astro.props;
+---
+
+<figure class="ui-quote">
+  <span class="ui-quote__mark" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+      <path d="M7.17 6A5.17 5.17 0 0 0 2 11.17V18h6.83v-6.83H5A2.17 2.17 0 0 1 7.17 9V6zm10 0A5.17 5.17 0 0 0 12 11.17V18h6.83v-6.83H15A2.17 2.17 0 0 1 17.17 9V6z"/>
+    </svg>
+  </span>
+  <div class="ui-quote__body">
+    <blockquote>
+      <slot />
+    </blockquote>
+    {(author || title) && (
+      <figcaption>
+        {author && <span class="ui-quote__author">{author}</span>}
+        {author && title && <span class="ui-quote__sep">—</span>}
+        {title && <span class="ui-quote__title">{title}</span>}
+      </figcaption>
+    )}
+  </div>
+</figure>
+
+<style>
+  .ui-quote {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    margin: 2rem 0;
+    padding: 1.4rem 1.5rem;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+  }
+  .ui-quote__mark {
+    flex-shrink: 0;
+    color: var(--accent);
+    opacity: 0.4;
+    line-height: 0;
+    margin-top: 0.2rem;
+  }
+  .ui-quote__body {
+    flex: 1;
+    min-width: 0;
+  }
+  .ui-quote__body blockquote {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-style: italic;
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: var(--fg-strong);
+  }
+  .ui-quote__body blockquote :global(p) {
+    margin: 0;
+  }
+  .ui-quote__body figcaption {
+    margin-top: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+  }
+  .ui-quote__author {
+    font-weight: 600;
+    color: var(--fg-strong);
+  }
+  .ui-quote__sep {
+    color: var(--fg-subtle);
+  }
+  .ui-quote__title {
+    color: var(--fg-muted);
+  }
+</style>
