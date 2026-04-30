@@ -4,6 +4,7 @@ import remarkMath from 'remark-math';
 import sitemap from '@astrojs/sitemap';
 import mdx from '@astrojs/mdx';
 import expressiveCode from 'astro-expressive-code';
+import pagefind from 'astro-pagefind';
 import fs from 'node:fs';
 import path from 'node:path';
 import remarkGallery from './scripts/remark-gallery.mjs';
@@ -110,6 +111,7 @@ export default defineConfig({
       },
     }),
     mdx(),
+    pagefind(),
     sitemap({
       filter: (page) => {
         const pathname = new URL(page).pathname;

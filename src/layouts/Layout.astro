@@ -1,4 +1,6 @@
 ---
+import Search from '../components/Search.astro';
+
 const isHome = Astro.url.pathname === '/';
 const {
   title = 'ml, bio, coding',
@@ -104,6 +106,8 @@ if (articleSchema && schemaArticle?.wordCount) {
   <link rel="preload" href="/fonts/GoogleSansCode-VariableItalic.woff2" as="font" type="font/woff2" crossorigin />
   {useKatex && <link rel="stylesheet" href="/katex.min.css" />}
   <link rel="stylesheet" href="/markdown.css" />
+  <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+  <script is:inline src="/pagefind/pagefind-ui.js"></script>
   <link rel="canonical" href={canonicalUrl} />
 
   <meta property="og:title" content={fullTitle} />
@@ -438,7 +442,8 @@ if (articleSchema && schemaArticle?.wordCount) {
   }
 
 
-  .theme-toggle {
+  .theme-toggle,
+  .search-trigger {
     border: none;
     background: none;
     color: var(--fg-muted);
@@ -449,6 +454,20 @@ if (articleSchema && schemaArticle?.wordCount) {
     display: inline-grid;
     place-items: center;
     transition: color 0.42s ease;
+  }
+
+  .search-trigger:hover {
+    color: var(--fg);
+  }
+
+  .search-trigger:focus-visible {
+    outline: 2px solid rgba(var(--accent-rgb), 0.35);
+    outline-offset: 2px;
+  }
+
+  .search-trigger-icon {
+    width: 16px;
+    height: 16px;
   }
 
   .theme-toggle:hover {
@@ -511,7 +530,7 @@ if (articleSchema && schemaArticle?.wordCount) {
 
 </head>
 <body>
-  <header class:list={['site-header', { 'full-bleed': fullBleed }]}>
+  <header class:list={['site-header', { 'full-bleed': fullBleed }]} data-pagefind-ignore>
     {isHome && favoriteSong && (
       <a class="home-song" href={favoriteSong.url} target="_blank" aria-label={`Favorite song right now: ${songTitle} by ${songArtist}`}>
         <span class="song-icon" aria-hidden="true">
@@ -538,6 +557,24 @@ if (articleSchema && schemaArticle?.wordCount) {
         <li>
           <button
             type="button"
+            class="search-trigger"
+            data-search-trigger
+            aria-label="Search (Ctrl+K)"
+            title="Search (Ctrl+K)"
+          >
+            <svg class="search-trigger-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                fill-rule="evenodd"
+                clip-rule="evenodd"
+                d="M3.5 7C3.5 5.067 5.067 3.5 7 3.5C8.933 3.5 10.5 5.067 10.5 7C10.5 7.88461 10.1718 8.69256 9.63058 9.30876L9.30876 9.63058C8.69256 10.1718 7.88461 10.5 7 10.5C5.067 10.5 3.5 8.933 3.5 7ZM9.96544 11.0261C9.13578 11.6382 8.11014 12 7 12C4.23858 12 2 9.76142 2 7C2 4.23858 4.23858 2 7 2C9.76142 2 12 4.23858 12 7C12 8.11014 11.6382 9.13578 11.0261 9.96544L14.0303 12.9697L14.5607 13.5L13.5 14.5607L12.9697 14.0303L9.96544 11.0261Z"
+              />
+            </svg>
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
             class="theme-toggle"
             data-theme-toggle
             aria-label="Switch to dark mode"
@@ -557,6 +594,7 @@ if (articleSchema && schemaArticle?.wordCount) {
   <main class:list={['page-main', { 'full-bleed': fullBleed }]}>
     <slot />
   </main>
+  <Search />
   <script is:inline>
     (() => {
       const root = document.documentElement;
