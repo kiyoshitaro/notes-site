@@ -3,6 +3,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import sitemap from '@astrojs/sitemap';
 import mdx from '@astrojs/mdx';
+import expressiveCode from 'astro-expressive-code';
 import fs from 'node:fs';
 import path from 'node:path';
 import remarkGallery from './scripts/remark-gallery.mjs';
@@ -90,6 +91,24 @@ export default defineConfig({
   trailingSlash: 'never',
   build: { format: 'file' },
   integrations: [
+    expressiveCode({
+      themes: ['github-light', 'github-dark-dimmed'],
+      useDarkModeMediaQuery: false,
+      themeCssSelector: (theme) => (theme.name.includes('dark') ? '[data-theme="dark"]' : '[data-theme="light"], :root:not([data-theme="dark"])'),
+      styleOverrides: {
+        borderRadius: '8px',
+        codeFontFamily: 'var(--font-mono)',
+        uiFontFamily: 'var(--font-mono)',
+        codeFontSize: '0.86rem',
+        frames: {
+          shadowColor: 'transparent',
+        },
+      },
+      defaultProps: {
+        wrap: false,
+        showLineNumbers: false,
+      },
+    }),
     mdx(),
     sitemap({
       filter: (page) => {
@@ -140,12 +159,5 @@ export default defineConfig({
   markdown: {
     remarkPlugins: [remarkMath, remarkGallery, remarkCallout, remarkSidenote, remarkTableWrap],
     rehypePlugins: [rehypeKatex],
-    shikiConfig: {
-      themes: {
-        light: 'github-light',
-        dark: 'github-dark-dimmed',
-      },
-      defaultColor: false,
-    },
   },
 });

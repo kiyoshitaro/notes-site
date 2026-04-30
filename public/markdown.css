@@ -70,7 +70,7 @@
   border-radius: 4px;
 }
 
-.markdown-body pre {
+.markdown-body pre:not(:where(.expressive-code *)) {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
   background: var(--surface-soft);
   color: var(--fg);
@@ -83,7 +83,7 @@
   border: 1px solid var(--border-soft);
 }
 
-.markdown-body pre code {
+.markdown-body pre:not(:where(.expressive-code *)) code {
   background: transparent;
   color: inherit;
   text-indent: 0;
@@ -94,33 +94,21 @@
   line-height: 1.4;
 }
 
-.markdown-body code {
+.markdown-body :not(pre) > code {
   padding: 0.15em 0.3em;
   font-size: 0.85em;
 }
 
-.markdown-body pre.astro-code,
-.markdown-body pre.astro-code span {
-  color: var(--shiki-light) !important;
-  background-color: var(--shiki-light-bg) !important;
-  font-style: var(--shiki-light-font-style);
-  font-weight: var(--shiki-light-font-weight);
-  text-decoration: var(--shiki-light-text-decoration);
-}
-
-:root[data-theme='dark'] .markdown-body pre.astro-code,
-:root[data-theme='dark'] .markdown-body pre.astro-code span {
-  color: var(--shiki-dark) !important;
-  background-color: var(--shiki-dark-bg) !important;
-  font-style: var(--shiki-dark-font-style);
-  font-weight: var(--shiki-dark-font-weight);
-  text-decoration: var(--shiki-dark-text-decoration);
-}
-
-.markdown-body pre, .markdown-body code, .markdown-body pre code {
+.markdown-body pre:not(:where(.expressive-code *)),
+.markdown-body :not(pre) > code,
+.markdown-body pre:not(:where(.expressive-code *)) code {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: break-word;
+}
+
+.markdown-body .expressive-code {
+  margin: 1.5em 0;
 }
 
 /* --- KaTeX display math: scrollable on overflow --- */

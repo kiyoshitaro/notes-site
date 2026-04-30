@@ -47,18 +47,18 @@ Top-tier docs offer `npm`, `pnpm`, and `yarn` installation options. With our cus
 
 <Tabs tabs={['npm', 'pnpm', 'yarn']}>
   <TabItem>
-    ```bash
-    npm install @astrojs/mdx
+    ```bash frame="terminal"
+    npm install @astrojs/mdx astro-expressive-code
     ```
   </TabItem>
   <TabItem>
-    ```bash
-    pnpm add @astrojs/mdx
+    ```bash frame="terminal"
+    pnpm add @astrojs/mdx astro-expressive-code
     ```
   </TabItem>
   <TabItem>
-    ```bash
-    yarn add @astrojs/mdx
+    ```bash frame="terminal"
+    yarn add @astrojs/mdx astro-expressive-code
     ```
   </TabItem>
 </Tabs>
@@ -86,9 +86,26 @@ Instead of a standard unordered list, the `<Steps>` component renders a clear ve
 
 ## Code Syntax Highlighting
 
+Code fences support **titles**, **line highlights**, **diff markers**, and a **copy button** — powered by [Expressive Code](https://expressive-code.com/).
+
+### Astro Page with Highlights
+
+```tsx title="src/pages/index.astro" {1,3-4} ins={5} del={6}
+---
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+const posts = await getCollection('post');
+const drafts = posts.filter(p => !p.data.published);
+const all = posts;
+---
+<Layout title="Welcome">
+  <main><h1>Hello World</h1></main>
+</Layout>
+```
+
 ### Rust — Performance Critical Code
 
-```rust
+```rust title="src/concurrent/sharded_map.rs" {22-26}
 /// A concurrent hash map using sharding
 use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
