@@ -1,0 +1,698 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const profile = {
+  name: 'Hung T. Nguyen',
+  handle: 'kiyoshitaro',
+  phone: '(+84) 344-933-366',
+  email: 'hunglhp1998@gmail.com',
+  linkedin: 'linkedin.com/in/hunglhp1998',
+  linkedinUrl: 'https://linkedin.com/in/hunglhp1998',
+  github: 'github.com/kiyoshitaro',
+  githubUrl: 'https://github.com/kiyoshitaro',
+  yearsOfExperience: 5,
+  summary: [
+    "I've been working as a software engineer for 5 years, primarily in backend systems. I approach learning core principles with an open mind, engineering with detail-oriented focus, emerging technologies and innovative ideas, building scalable and resilient systems.",
+    'Open to new opportunities. Ready to adapt to new technologies and industries, focusing on system profiling, optimizing workloads, to build platforms that are both high-performance at massive scale.',
+  ],
+};
+
+const education = [
+  {
+    school: 'School of Information and Communication Technology, HUST',
+    period: 'Sep 2016 - Sep 2021',
+    degree: 'Degree of Engineer in Talent Programs',
+    extra: 'TOEIC: 790',
+  },
+  {
+    school: 'Le Hong Phong High School, Nam Dinh',
+    period: '2013 - 2016',
+    degree: null,
+    extra: null,
+  },
+];
+
+const skillGroups = [
+  { label: 'Languages', items: ['TypeScript/JavaScript', 'Python', 'Go', 'C/C++'] },
+  { label: 'Libraries', items: ['NestJS', 'SocketIO', 'BullMQ', 'Ethers.js', 'RabbitMQ'] },
+  { label: 'Data Storage', items: ['PostgreSQL', 'Redis', 'TimescaleDB', 'Firestore'] },
+  { label: 'Deployment', items: ['Docker', 'Git', 'Google Cloud Platform', 'Cloudflare'] },
+];
+
+const specialized = [
+  'Proficient in building end-to-end backend projects using NestJS: database design, codebase, deployment.',
+  'Proficient in using in-memory storage for various tasks to optimize performance.',
+  'Experienced in WebSocket and many types of storage: PostgreSQL, TimescaleDB, Firestore, vectorDB.',
+  'Worked with LLM/AI agents, integrating diverse data to build context-aware chatbot and automation solutions.',
+  'Understanding of blockchain concepts, experienced in diverse Dapp narratives across EVM, Solana.',
+  'Knowledge of containerization and cloud deployment technologies.',
+];
+
+const experience = [
+  {
+    company: 'Viettel Digital Services',
+    role: 'Software Engineer',
+    period: 'Sep 2025 - Present',
+    projects: [
+      {
+        name: null,
+        bullets: [
+          'Research on blockchain technologies and proposed integration of crypto payment rails into traditional financial systems.',
+          'Collaborated with team to experiment AI-driven SDLC models (spec-driven, test-driven) in building a payment gateway, leveraging agentic skills framework to automate and accelerate development.',
+        ],
+        accomplishments: [],
+      },
+    ],
+  },
+  {
+    company: 'Lab3',
+    role: 'Backend Engineer',
+    period: 'April 2023 - Sep 2025',
+    projects: [
+      {
+        name: 'Telegram Trading Bot',
+        bullets: [
+          'Developed a Telegram-based trading tool that relays user orders to Hyperliquid: handle complex conversation logic flows, tracking and analyzing whale signals on Hyperliquid, forwarding orders efficiently.',
+          "Implemented request relayer to bypass Hyperliquid's rate limits with self-hosted rotating proxy, connection pooling, smart caching and offloaded complex API data processing. Achieved 30% latency reduction and 25–30% request savings with minimal static IPs.",
+          'Built secure wallet management in isolated node, encrypted private-key storage, and transaction signing.',
+        ],
+        accomplishments: [
+          'Led a technical team (3-4 devs) in coordinating discussions and decision-making.',
+        ],
+      },
+      {
+        name: 'LLM Apps',
+        bullets: [
+          'Built a crypto agent with team for social content generation, on-chain action recommendations and automated DeFi execution based on user requests.',
+          'Collected external data from social platforms, on-chain data, real-time pricing, web crawlers, and search engines to enrich contextuality for LLM; optimized efficient caching mechanisms, significantly reducing requests.',
+          'Responsible for tech stack decisions, core backend codebase, data collector, and deployment pipelines.',
+        ],
+        accomplishments: [],
+      },
+      {
+        name: 'Gamble App',
+        bullets: [
+          'Developed and scaled a real-time cryptocurrency price feeding system for matching and live/OHLC charts using TimescaleDB and Socket.IO.',
+          'Implemented dynamic ranking engine to track user engagement with social tasks and in-game actions for airdrop.',
+        ],
+        accomplishments: [
+          'Extensive experience in synchronizing transactions and executing smart contracts on Solana, EVM.',
+        ],
+      },
+    ],
+  },
+  {
+    company: 'Neko Global / Accel3 Company',
+    role: 'Backend Engineer',
+    period: 'Feb 2022 - April 2023',
+    projects: [
+      {
+        name: 'Nekoverse MMORPG',
+        bullets: [
+          'Built a server-authoritative game with team, mainly responsible for designing storage for multiple game modes, leaderboards, rewards, and upgrade mechanics.',
+          'Primarily worked on designing the structure and implementing the logic for a turn-based game from the server side, using Colyseus WebSocket-based communication.',
+        ],
+        accomplishments: [
+          'Proficient in BE frameworks: NestJS, ExpressJS, and skilled in Google Cloud Platform.',
+          'Ability to work with both real-time communication technologies and multiple storage: PostgreSQL, Redis.',
+          'Knowledgeable about microservices architecture pattern.',
+        ],
+      },
+    ],
+  },
+  {
+    company: 'Avepoint Company',
+    role: 'Software Engineer',
+    period: 'Mar 2021 - Feb 2022',
+    projects: [
+      {
+        name: 'Azure VM Backup project',
+        bullets: [
+          "Implemented UI components and user's flow for the Azure VM Backup project using ReactJS.",
+        ],
+        accomplishments: [
+          'Acquired skills in working within a systematic and global environment, enhancing communication abilities and making effective proposals.',
+        ],
+      },
+    ],
+  },
+  {
+    company: 'VINIF - Hanoi University of Science and Technology',
+    role: 'Student Researcher',
+    period: 'Dec 2020 - Dec 2021',
+    projects: [
+      {
+        name: 'Polyp Segmentation',
+        links: [
+          { label: 'paper', url: 'https://link.springer.com/chapter/10.1007/978-3-031-20716-7_11' },
+        ],
+        bullets: [
+          'Aggregated models and integrated techniques for the polyp segmentation task and published in ISVC-2022 GCEENet.',
+        ],
+        accomplishments: [
+          'Enhanced deep learning proficiency, focusing on researching and implementing complex models.',
+        ],
+      },
+    ],
+  },
+  {
+    company: 'Cinnamon AI Lab',
+    role: 'AI Engineer Intern',
+    period: 'Jan 2019 - May 2020',
+    projects: [
+      {
+        name: 'Key-Value Extraction',
+        bullets: [
+          'Researching relational reasoning in graph-CNN and responsible for key-value extraction from raw documents.',
+        ],
+        accomplishments: [
+          'Experienced in data processing challenges with knowledge of fundamental machine learning and deep learning algorithms.',
+        ],
+      },
+    ],
+  },
+];
+
+const projects = [
+  {
+    name: 'NestJS Backend Utility Service',
+    description: 'Publish comprehensive backend codebase using NestJS, featuring a 3-layers architecture.',
+    repoUrl: 'https://github.com/kiyoshitaro',
+  },
+  {
+    name: 'Resilient Proxy',
+    description: 'A proxy layer written in OpenResty for resilient 3rd-party API calls with masked routing, caching, retries and monitoring.',
+    repoUrl: 'https://github.com/kiyoshitaro',
+  },
+  {
+    name: 'Hyperliquid Tracker',
+    description: 'A real-time trading signal for monitoring whale activities on the HyperLiquid.',
+    repoUrl: 'https://github.com/kiyoshitaro',
+  },
+  {
+    name: 'Solana Wallet Analyzer',
+    description: 'Analyze trading patterns of wallets on the Solana blockchain to detect smart money.',
+    repoUrl: 'https://github.com/kiyoshitaro',
+  },
+  {
+    name: 'PyTorch Image Segmentation Template',
+    description: 'A template for segmentation tasks providing missions fast and easily.',
+    repoUrl: 'https://github.com/kiyoshitaro/polyp_segmentation',
+  },
+];
+
+const honors = [
+  { title: 'Third Place — Analytics Olympic Mathematics Contest', date: 'May 2017' },
+  { title: 'GRAND-Prize — 2016 First International Science Competition Vietnam', date: 'Apr 2017' },
+  { title: 'Bronze Medal — International Mathematical Tournament of Towns', date: 'Feb 2016' },
+  { title: 'GOLD Medal — Mathematics at "HSGS Olympiad"', date: 'May 2015' },
+];
+
+const activities = [
+  { name: 'FPT Young Talent Club', tag: 'FYT' },
+];
+---
+
+<Layout
+  title="profile — hungnt"
+  description="Profile of Hung T. Nguyen — software engineer, backend, blockchain, LLM/AI, real-time systems."
+>
+  <section class="profile-page">
+    <header class="profile-header">
+      <h1 class="profile-name">{profile.name}</h1>
+      <p class="profile-tagline">software engineer · backend · blockchain · LLM/AI</p>
+      <ul class="profile-contacts">
+        <li><span class="contact-label">phone</span><span class="contact-value">{profile.phone}</span></li>
+        <li><span class="contact-label">email</span><a class="contact-value" href={`mailto:${profile.email}`}>{profile.email}</a></li>
+        <li><span class="contact-label">linkedin</span><a class="contact-value" href={profile.linkedinUrl} target="_blank" rel="noopener noreferrer">{profile.linkedin}</a></li>
+        <li><span class="contact-label">github</span><a class="contact-value" href={profile.githubUrl} target="_blank" rel="noopener noreferrer">{profile.github}</a></li>
+      </ul>
+    </header>
+
+    <section class="profile-section">
+      <div class="section-header">summary</div>
+      {profile.summary.map((p) => <p class="summary-text">{p}</p>)}
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">education</div>
+      <ul class="entry-list">
+        {education.map((edu) => (
+          <li class="entry">
+            <div class="entry-row">
+              <span class="entry-title">{edu.school}</span>
+              <span class="entry-period">{edu.period}</span>
+            </div>
+            {edu.degree && <div class="entry-sub">{edu.degree}</div>}
+            {edu.extra && <div class="entry-meta">{edu.extra}</div>}
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">skills</div>
+      <ul class="skills-grid">
+        {skillGroups.map((group) => (
+          <li class="skill-group">
+            <span class="skill-label">{group.label}</span>
+            <span class="skill-items">
+              {group.items.map((item, i) => (
+                <>
+                  <span class="skill-tag">{item}</span>{i < group.items.length - 1 && <span class="skill-sep">·</span>}
+                </>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div class="specialized">
+        <div class="specialized-label">specialized knowledge</div>
+        <ul class="bullet-list">
+          {specialized.map((s) => <li>{s}</li>)}
+        </ul>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">experience</div>
+      <ul class="entry-list">
+        {experience.map((job) => (
+          <li class="entry job-entry">
+            <div class="entry-row">
+              <span class="entry-title">{job.company}</span>
+              <span class="entry-period">{job.period}</span>
+            </div>
+            <div class="entry-sub">{job.role}</div>
+            {job.projects.map((proj) => (
+              <div class="project-block">
+                {proj.name && (
+                  <div class="project-head">
+                    <span class="project-name">{proj.name}</span>
+                    {proj.links && proj.links.length > 0 && (
+                      <span class="project-links">
+                        {proj.links.map((l) => (
+                          <a class="code-link" href={l.url} target="_blank" rel="noopener noreferrer" aria-label={`${proj.name} ${l.label}`}>
+                            <svg class="code-icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                              <path fill="currentColor" d="M10 1H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5l-4-4zm0 1.5L13.5 6H10V2.5zM4 2h5v5h5v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>
+                            </svg>
+                            <span>{l.label}</span>
+                          </a>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <ul class="bullet-list">
+                  {proj.bullets.map((b) => <li set:html={b} />)}
+                </ul>
+                {proj.accomplishments.length > 0 && (
+                  <div class="accomplishments">
+                    <div class="accomp-label">accomplishments</div>
+                    <ul class="bullet-list">
+                      {proj.accomplishments.map((a) => <li set:html={a} />)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">projects & development</div>
+      <ul class="entry-list">
+        {projects.map((p) => (
+          <li class="entry project-entry">
+            <div class="entry-row">
+              <span class="entry-title">{p.name}</span>
+              <a class="code-link" href={p.repoUrl} target="_blank" rel="noopener noreferrer" aria-label={`${p.name} source code`}>
+                <svg class="code-icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                  <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                <span>code</span>
+              </a>
+            </div>
+            <div class="entry-meta">{p.description}</div>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">honors & awards</div>
+      <ul class="entry-list">
+        {honors.map((h) => (
+          <li class="entry">
+            <div class="entry-row">
+              <span class="entry-title">{h.title}</span>
+              <span class="entry-period">{h.date}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">activities</div>
+      <ul class="entry-list">
+        {activities.map((a) => (
+          <li class="entry">
+            <div class="entry-row">
+              <span class="entry-title">{a.name}</span>
+              <span class="entry-period">{a.tag}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  </section>
+</Layout>
+
+<style>
+  .profile-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 1rem 1rem 4rem;
+    font-family: "Google Sans Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  .profile-header {
+    padding: 0 0 1.25rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .profile-name {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin: 0 0 0.4rem;
+    letter-spacing: 0.02em;
+    color: var(--fg-strong);
+  }
+
+  .profile-tagline {
+    margin: 0 0 1rem;
+    font-size: 0.85rem;
+    color: var(--fg-soft);
+    letter-spacing: 0.04em;
+  }
+
+  .profile-contacts {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.4rem 1rem;
+    font-size: 0.78rem;
+  }
+
+  .profile-contacts li {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+  }
+
+  .contact-label {
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    min-width: 4.5rem;
+  }
+
+  .contact-value {
+    color: var(--fg);
+    text-decoration: none;
+  }
+
+  a.contact-value:hover {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .profile-section {
+    margin-bottom: 2rem;
+  }
+
+  .section-header {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--fg-strong);
+    margin-bottom: 1rem;
+    text-transform: lowercase;
+    border-bottom: 2px solid var(--border-strong);
+    padding-bottom: 0.55rem;
+  }
+
+  .summary-text {
+    margin: 0 0 0.6rem;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--fg);
+  }
+
+  .entry-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .entry {
+    padding: 0.65rem 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .entry:last-child {
+    border-bottom: none;
+  }
+
+  .job-entry {
+    padding: 1rem 0 0.85rem;
+  }
+
+  .entry-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .entry-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--fg-strong);
+  }
+
+  .entry-period {
+    font-size: 0.75rem;
+    color: var(--fg-subtle);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .entry-sub {
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    font-style: italic;
+    margin-top: 0.15rem;
+  }
+
+  .entry-meta {
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    margin-top: 0.25rem;
+    line-height: 1.55;
+  }
+
+  .skills-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .skill-group {
+    display: flex;
+    gap: 1rem;
+    align-items: baseline;
+    font-size: 0.82rem;
+    flex-wrap: wrap;
+  }
+
+  .skill-label {
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    min-width: 7rem;
+  }
+
+  .skill-items {
+    color: var(--fg);
+    flex: 1;
+    line-height: 1.7;
+  }
+
+  .skill-tag {
+    color: var(--fg);
+  }
+
+  .skill-sep {
+    color: var(--border-strong);
+    margin: 0 0.45rem;
+  }
+
+  .specialized {
+    background: var(--surface-soft);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 0.85rem 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .specialized-label,
+  .accomp-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+    margin-bottom: 0.5rem;
+  }
+
+  .bullet-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.4rem 0 0;
+    font-size: 0.85rem;
+    line-height: 1.55;
+  }
+
+  .bullet-list li {
+    position: relative;
+    padding-left: 1.1rem;
+    margin-bottom: 0.35rem;
+    color: var(--fg);
+  }
+
+  .bullet-list li::before {
+    content: '–';
+    position: absolute;
+    left: 0;
+    color: var(--fg-subtle);
+  }
+
+  .project-block {
+    margin-top: 0.65rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--border-soft);
+  }
+
+  .project-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--fg-strong);
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+  }
+
+  .project-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+  }
+
+  .project-links {
+    display: inline-flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .accomplishments {
+    margin-top: 0.55rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border-soft);
+  }
+
+  .project-entry .entry-title {
+    font-size: 0.9rem;
+  }
+
+  .code-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--fg-soft);
+    text-decoration: none;
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    padding: 0.2rem 0.5rem;
+    background: var(--surface-soft);
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+    white-space: nowrap;
+  }
+
+  .code-link:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--surface-note);
+  }
+
+  .code-icon {
+    flex-shrink: 0;
+  }
+
+  .bullet-list :global(.inline-link) {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
+  .bullet-list :global(.inline-link:hover) {
+    color: var(--accent-hover);
+  }
+
+  @media (max-width: 600px) {
+    .profile-name {
+      font-size: 1.35rem;
+    }
+
+    .profile-contacts {
+      grid-template-columns: 1fr;
+    }
+
+    .skill-group {
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .skill-label {
+      min-width: auto;
+    }
+
+    .entry-row {
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>
