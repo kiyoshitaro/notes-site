@@ -1,6 +1,6 @@
 /* markdown.css */
 .markdown-body {
-  font-family: var(--font-sans, system-ui, sans-serif);
+  font-family: var(--font-mono);
   color: var(--fg);
   background: transparent;
   line-height: 1.7;
