@@ -1,7 +1,8 @@
 ---
 import Search from '../components/Search.astro';
+import { withBase } from '../lib/url';
 
-const isHome = Astro.url.pathname === '/';
+const isHome = Astro.url.pathname === '/' || Astro.url.pathname === withBase('/');
 const {
   title = 'ml, bio, coding',
   description = 'thoughts on neural nets, chips, and cells',
@@ -26,11 +27,13 @@ const songTitle = songParts?.[0] || favoriteSong?.title || '';
 const songArtist = songParts?.[1] || '';
 const fullTitle = title;
 const cleanPath = Astro.url.pathname.replace(/\.html$/, '').replace(/\/$/, '') || '/';
-const canonicalUrl = Astro.site ? new URL(cleanPath, Astro.site).toString() : Astro.url.toString();
-const siteUrl = Astro.site ? new URL('/', Astro.site).toString() : canonicalUrl;
+const origin = Astro.site ? Astro.site.origin : '';
+const canonicalUrl = origin ? `${origin}${cleanPath}` : Astro.url.toString();
+const baseWithSlash = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const siteUrl = origin ? `${origin}${baseWithSlash}` : canonicalUrl;
 const ogImageUrl = ogImage
-  ? (Astro.site ? new URL(ogImage, Astro.site).toString() : ogImage)
-  : (Astro.site ? new URL('/favicon.ico', Astro.site).toString() : '/favicon.ico');
+  ? (origin ? `${origin}${withBase(ogImage)}` : ogImage)
+  : (origin ? `${origin}${withBase('/favicon.ico')}` : '/favicon.ico');
 const twitterCard = ogImage ? 'summary_large_image' : 'summary';
 const extraSchemas = Array.isArray(schema) ? schema : schema ? [schema] : [];
 const personSchema = {
@@ -101,13 +104,13 @@ if (articleSchema && schemaArticle?.wordCount) {
   <meta name="robots" content={robots} />
 
   <title>{fullTitle}</title>
-  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
-  <link rel="preload" href="/fonts/GoogleSansCode-Variable.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="preload" href="/fonts/GoogleSansCode-VariableItalic.woff2" as="font" type="font/woff2" crossorigin />
-  {useKatex && <link rel="stylesheet" href="/katex.min.css" />}
-  <link rel="stylesheet" href="/markdown.css" />
-  <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
-  <script is:inline src="/pagefind/pagefind-ui.js"></script>
+  <link rel="icon" href={withBase('/favicon.ico')} type="image/x-icon" />
+  <link rel="preload" href={withBase('/fonts/GoogleSansCode-Variable.woff2')} as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href={withBase('/fonts/GoogleSansCode-VariableItalic.woff2')} as="font" type="font/woff2" crossorigin />
+  {useKatex && <link rel="stylesheet" href={withBase('/katex.min.css')} />}
+  <link rel="stylesheet" href={withBase('/markdown.css')} />
+  <link rel="stylesheet" href={withBase('/pagefind/pagefind-ui.css')} />
+  <script is:inline src={withBase('/pagefind/pagefind-ui.js')}></script>
   <link rel="canonical" href={canonicalUrl} />
 
   <meta property="og:title" content={fullTitle} />
@@ -545,7 +548,7 @@ if (articleSchema && schemaArticle?.wordCount) {
     )}
     {!isHome && !hideBackLink && (
       <div class="site-title">
-        <a href="/">
+        <a href={withBase('/')}>
           <span class="arrow">&#8592;</span>
           <span class="site-label">{new URL(siteUrl).hostname}</span>
         </a>
@@ -586,7 +589,7 @@ if (articleSchema && schemaArticle?.wordCount) {
             </svg>
           </button>
         </li>
-        <li><a href="/profile">profile</a></li>
+        <li><a href={withBase('/profile')}>profile</a></li>
         <li><a href="https://facebook.com/hunglhp1998" target="_blank" rel="noopener noreferrer">@hunglhp1998</a></li>
         <li><a href="https://github.com/kiyoshitaro" target="_blank" rel="noopener noreferrer">github</a></li>
       </ul>

@@ -4,6 +4,7 @@ import { getCollection } from 'astro:content';
 import BookCard from './BookCard.astro';
 import { getBookConfigs } from '../data/books';
 import { resolveBookFromDocs } from '../lib/books';
+import { withBase } from '../lib/url';
 
 interface Props {
   posts: CollectionEntry<'blog'>[];
@@ -42,8 +43,8 @@ const latestPostDate = posts.reduce((latest, post) => {
   return date && date > latest ? date : latest;
 }, new Date(0));
 const latestPostLabel = latestPostDate.getTime() ? formatLongDate(latestPostDate) : '—';
-const githubGraphLightSrc = '/images/github-heat-light.svg';
-const githubGraphDarkSrc = '/images/github-heat-dark.svg';
+const githubGraphLightSrc = withBase('/images/github-heat-light.svg');
+const githubGraphDarkSrc = withBase('/images/github-heat-dark.svg');
 
 // Category colors (theme-aware CSS variables)
 const catColors: Record<string, string> = {
@@ -104,7 +105,7 @@ const categoryCount = new Set(posts.map(p => p.data.cat).filter(Boolean)).size;
 
         return (
           <li class="index-item">
-            <a href={`/blog/${post.id}`} class="index-link">
+            <a href={withBase(`/blog/${post.id}`)} class="index-link">
               <span class="index-num">{indexNum}</span>
               <span class="index-title">{post.data.title}</span>
               <span class="index-meta">

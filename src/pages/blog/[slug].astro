@@ -43,7 +43,7 @@ const readingTimeMinutes = Math.max(1, Math.round((wordCount / 200) * multiplier
 const readingTimeLabel = readingTimeMinutes < 60
   ? `approx ${readingTimeMinutes}m read`
   : `approx ${Math.floor(readingTimeMinutes / 60)}h${readingTimeMinutes % 60 ? ` ${readingTimeMinutes % 60}m` : ''} read`;
-const siteUrl = new URL('/', Astro.site).toString();
+const siteUrl = new URL(import.meta.env.BASE_URL, Astro.site).toString().replace(/\/$/, '');
 ---
 <style>
 :root {
@@ -301,7 +301,7 @@ article.post-plain :global(img[width]) {
     updatedTime,
     section: post.data.cat,
     wordCount: wordCount || undefined,
-    imageUrl: new URL(`/og/${post.id}.png`, siteUrl).href,
+    imageUrl: `${siteUrl}/og/${post.id}.png`,
   }}
   schema={{
     "@context": "https://schema.org",

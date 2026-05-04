@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import { getCollection } from 'astro:content';
 import { getBookConfigs } from '../../data/books';
 import { resolveBookFromDocs } from '../../lib/books';
+import { withBase } from '../../lib/url';
 
 export async function getStaticPaths() {
   const docs = await getCollection('books', ({ data }) => data.published);
@@ -18,7 +19,7 @@ const docs = await getCollection('books', ({ data }) => data.published);
 const resolvedBook = resolveBookFromDocs(bookId!, docs);
 const chapterCount = resolvedBook.chapters.length;
 const firstChapter = resolvedBook.chapters[0];
-const siteUrl = new URL('/', Astro.site).toString();
+const siteUrl = new URL(import.meta.env.BASE_URL, Astro.site).toString().replace(/\/$/, '');
 ---
 
 
@@ -213,7 +214,7 @@ const siteUrl = new URL('/', Astro.site).toString();
       </div>
       {firstChapter && (
         <div class="book-actions">
-          <a class="book-start" href={firstChapter.href}>
+          <a class="book-start" href={withBase(firstChapter.href)}>
             <span>Start reading</span>
             <span class="book-start-arrow">→</span>
           </a>
@@ -228,7 +229,7 @@ const siteUrl = new URL('/', Astro.site).toString();
           <ol class="chapter-list">
             {stage.chapters.map((chapter) => (
               <li class="chapter-item">
-                <a class="chapter-link" href={chapter.href}>
+                <a class="chapter-link" href={withBase(chapter.href)}>
                   <span class="chapter-number">{String(chapter.order).padStart(2, '0')}</span>
                   <span>
                     <span class="chapter-name">{chapter.doc.data.title}</span>

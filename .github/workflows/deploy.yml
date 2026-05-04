@@ -39,6 +39,7 @@ jobs:
         run: pnpm build
         env:
           SITE_URL: https://kiyoshitaro.github.io
+          BASE_PATH: /notes-site
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
