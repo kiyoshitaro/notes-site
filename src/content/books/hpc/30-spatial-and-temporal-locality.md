@@ -61,3 +61,130 @@ Bài toán Knapsack: Ơ đây iterative thắng recursive
 Trong Quy hoạch động, việc viết vòng lặp for theo thứ tự hợp lý để "chiều lòng" bộ nhớ đệm (Cache-friendly) quan trọng không kém việc tối ưu số lượng phép tính
 
 ....
+
+## Bài tập
+
+### Câu hỏi tư duy
+
+1. Phân biệt temporal vs spatial locality bằng ví dụ cụ thể (không phải code).
+2. Linked list traversal có locality nào? Array traversal? Tại sao array luôn thắng cho sequential workload?
+3. Hash table lookup: locality thế nào? Có cách nào improve?
+4. Recursive Fibonacci không memoize có locality tốt không? Memoize bằng array vs bằng hashmap?
+5. Tile/blocking technique áp dụng spatial hay temporal locality?
+
+### Bài tập code
+
+**Bài 1**: Cho linked list 1M nodes vs array 1M ints. Đo thời gian sum sequential. Giải thích diff.
+
+**Bài 2**: Knapsack DP với W=10000, N=1000. Implement 3 version:
+- (a) 2D array `f[N+1][W+1]`
+- (b) 1D array `f[W+1]` rolling
+- (c) `std::bitset<W+1>` với operator `|=`
+Benchmark, giải thích.
+
+**Bài 3**: Matrix multiply `C = A*B` với 3 cách inner loop order: `i,j,k` vs `i,k,j` vs `j,k,i`. Cái nào nhanh nhất? Why?
+
+## Đáp án
+
+### Câu hỏi tư duy
+
+1. Temporal: bạn vừa đọc cuốn sách, để trên bàn — sẽ đọc lại trong vài phút tới. Spatial: bạn lấy bút từ ngăn kéo — bút khác trong cùng ngăn cũng dễ với tới. Trong code:
+   - Temporal: biến `i` trong loop counter — dùng liên tục.
+   - Spatial: `arr[i+1]` sau `arr[i]` — gần nhau.
+
+2. Linked list: pointer chase, mỗi node có thể ở chỗ bất kỳ → poor spatial locality, mỗi node ≈ 1 cache miss. Array: 16 int / cache line → 1 miss / 16 access → 16x throughput. Cũng prefetcher hit pattern dễ.
+
+3. Hash table: lookup = hash → random index → poor spatial locality. Improve:
+   - Open addressing + linear probing: collision dùng cache line tiếp theo.
+   - Robin Hood hashing: short probe length → tighter clusters.
+   - Cache-conscious: bucket size = cache line → 1 miss/lookup.
+
+4. Recursive Fib không memo: rất poor (exponential calls, stack thrash). Memo bằng array: tốt — sequential access. Memo bằng hashmap: kém hơn vì hash random + pointer chasing trong chain. Array O(n) memory nhưng cache-perfect; hashmap O(n) nhưng pointer chase.
+
+5. Cả hai. Tile cho matrix multiply: chia thành block fit cache. **Temporal**: block A và B reuse nhiều lần trong block computation. **Spatial**: trong block, access sequential trong rows.
+
+### Bài tập code
+
+**Bài 1 — list vs array**:
+
+```c
+struct Node { int value; struct Node* next; };
+struct Node* head = ...; // 1M random heap allocations
+
+long sum_list(struct Node* head) {
+    long s = 0;
+    for (struct Node* n = head; n; n = n->next) s += n->value;
+    return s;
+}
+
+long sum_array(const int* a, int n) {
+    long s = 0;
+    for (int i = 0; i < n; i++) s += a[i];
+    return s;
+}
+```
+
+Result: array ~10-20x faster. List nodes scattered → 1 miss / node. Array packs 16 int / cache line → prefetch hits. Even worse if list nodes allocated by malloc with fragmentation.
+
+**Bài 2 — Knapsack**:
+
+```c
+// (a) 2D
+int f2d[N+1][W+1] = {0};
+for (int n = 1; n <= N; n++) {
+    for (int w = 0; w <= W; w++) {
+        f2d[n][w] = (c[n-1] > w) ? f2d[n-1][w]
+                    : (f2d[n-1][w] > c[n-1] + f2d[n-1][w-c[n-1]] ? f2d[n-1][w] : c[n-1] + f2d[n-1][w-c[n-1]]);
+    }
+}
+
+// (b) 1D rolling
+int f1d[W+1] = {0};
+for (int n = 0; n < N; n++) {
+    for (int w = W; w >= c[n]; w--) {  // reverse to avoid overwriting
+        if (f1d[w-c[n]] + c[n] > f1d[w]) f1d[w] = f1d[w-c[n]] + c[n];
+    }
+}
+
+// (c) bitset (subset-sum variant only)
+#include <bitset>
+std::bitset<W+1> b;
+b[0] = 1;
+for (int n = 0; n < N; n++) b |= b << c[n];
+```
+
+Performance N=1000, W=10000:
+- (a) 2D: ~50ms — 40MB working set, far exceeds L1/L2.
+- (b) 1D: ~30ms — 40KB working set, fits L1.
+- (c) bitset: ~3ms — 1.25KB, fits L1, plus 64-bit parallel ops.
+
+(c) is 10x faster due to: bit packing × SIMD (compiler vectorizes shift+OR). Only works for subset-sum, not full knapsack with values.
+
+**Bài 3 — matmul loop order**:
+
+```c
+// i,j,k — naive
+for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j++)
+        for (int k = 0; k < n; k++)
+            C[i][j] += A[i][k] * B[k][j];  // B stride = n, BAD
+
+// i,k,j — better
+for (int i = 0; i < n; i++)
+    for (int k = 0; k < n; k++)
+        for (int j = 0; j < n; j++)
+            C[i][j] += A[i][k] * B[k][j];  // C and B sequential, GOOD
+
+// j,k,i — terrible
+for (int j = 0; j < n; j++)
+    for (int k = 0; k < n; k++)
+        for (int i = 0; i < n; i++)
+            C[i][j] += A[i][k] * B[k][j];  // C, A both stride n
+```
+
+For n=1024:
+- `i,j,k`: ~10s (B accessed column-wise → thrash)
+- `i,k,j`: ~3s (all three sequential in inner loop)
+- `j,k,i`: ~15s (worst — 2 of 3 stride n)
+
+`i,k,j` wins because A[i][k] is constant during inner loop (broadcast), B[k][j] and C[i][j] sequential. Combined with blocking + AVX, matmul achieves >50% peak FLOPS.

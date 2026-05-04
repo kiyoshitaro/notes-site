@@ -94,3 +94,60 @@ Thông thường, chúng ta hay nghĩ CPU chậm là do tính toán (Back-end), 
             xchg edi, esi
             jmp normal      ; Xong thì quay lại
         ```
+
+## Bài tập
+
+### Câu hỏi tư duy
+
+1. Front-end vs Back-end bottleneck: làm sao biết code đang stall ở đâu? Tool gì dùng để đo?
+2. Tại sao alignment quan trọng cho hot loops? 16-byte vs 32-byte vs 64-byte alignment khác nhau thế nào?
+3. Loop unrolling cải thiện gì? Khi nào unroll quá nhiều lại hại?
+4. Inline function: lợi và hại về code layout?
+5. Dùng `__attribute__((cold))` có tác dụng gì với compiler?
+
+### Bài tập code
+
+**Bài 1**: Viết hot loop và force compiler align nó vào 32-byte boundary. Inspect assembly bằng `objdump -d`. Tìm `nop` padding chèn vào.
+
+**Bài 2**: Cho function với rare error path. Mark error path bằng `__attribute__((cold))`. So sánh assembly layout có và không có hint.
+
+## Đáp án
+
+### Câu hỏi tư duy
+
+1. Tool: `perf stat` với event như `idq.mite_uops`, `idq_uops_not_delivered.core` (Intel). High = front-end stall. `cycle_activity.stalls_l1d_miss` etc cho back-end. Intel VTune phân tích chi tiết. Quy tắc: nếu IPC thấp + nhiều branch miss/icache miss → front-end. IPC thấp + cache miss/data hazard → back-end.
+
+2. CPU fetch instructions theo block 16 hoặc 32 byte. Loop top không align có thể split across blocks → 1 extra fetch cycle. 16-byte: SSE generation. 32-byte: AVX/Haswell+ (uop cache line). 64-byte: cache line align (rare cho code). Compiler `-falign-loops=16` hoặc `[[gnu::aligned(32)]]` force.
+
+3. Unroll: giảm branch overhead (loop test), tăng ILP (more independent ops/iter). Hại khi: (1) code blow up → I-cache miss tăng. (2) Vượt qua "uop cache" (~1500 uops Intel) → fall back to slow legacy decoder. Sweet spot thường 4-8x unroll.
+
+4. Inline lợi: bỏ call overhead, enable cross-function optimization. Hại: code growth → I-cache pressure, có thể làm hot loop không vừa uop cache.
+
+5. `cold` attribute: compiler đặt function trong section `.text.cold` (xa hot code), không inline, dùng smaller alignment. Caller skip prefetch. Tốt cho error handlers, init code.
+
+### Bài tập code
+
+**Bài 1**: Compile với `-O2 -falign-loops=32`, inspect:
+```bash
+gcc -O2 -falign-loops=32 -c hot.c
+objdump -d hot.o | head -30
+```
+Sẽ thấy `nopl 0x0(%rax,%rax,1)` hoặc multi-byte nop chèn vào trước loop top. Address của loop entry là multiple of 32.
+
+**Bài 2**: 
+```c
+__attribute__((cold))
+int handle_error(int code) {
+    fprintf(stderr, "error %d\n", code);
+    return -1;
+}
+
+int process(int x) {
+    if (x < 0) return handle_error(x);
+    return x * 2;
+}
+```
+
+`objdump -d` sẽ cho thấy `handle_error` ở section `.text.unlikely` hoặc tách xa. Without hint, compiler có thể inline error path → I-cache pollution mỗi lần `process` được gọi.
+
+
