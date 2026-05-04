@@ -1,6 +1,6 @@
 ---
 title: "CUDA C++: Giới thiệu cơ bản"
-pubDate: "2026-05-04"
+pubDate: "2026-04-30"
 published: true
 contents_table: true
 pinned: false

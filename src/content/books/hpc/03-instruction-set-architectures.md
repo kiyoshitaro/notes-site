@@ -1,6 +1,6 @@
 ---
 title: "Instruction Set Architectures"
-pubDate: "2026-05-04"
+pubDate: "2026-03-27"
 published: true
 description: "Instruction Set Architectures"
 useKatex: false

@@ -1,6 +1,6 @@
 ---
 title: "Kiến trúc máy tính: Ghi chú cơ bản"
-pubDate: "2026-05-04"
+pubDate: "2024-10-25"
 published: true
 contents_table: true
 pinned: false

@@ -1,6 +1,6 @@
 ---
 title: "Modern Hardware"
-pubDate: "2026-05-04"
+pubDate: "2026-03-24"
 published: true
 description: "Modern Hardware"
 useKatex: false

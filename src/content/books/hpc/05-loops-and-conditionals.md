@@ -1,6 +1,6 @@
 ---
 title: "Loops and Conditionals"
-pubDate: "2026-05-04"
+pubDate: "2026-03-28"
 published: true
 description: "Loops and Conditionals"
 useKatex: false

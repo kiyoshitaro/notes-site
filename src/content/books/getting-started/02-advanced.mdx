@@ -6,16 +6,16 @@ description: "Deep dive into advanced markdown features and reusable MDX compone
 useKatex: true
 ---
 
-import Callout from '../../../components/ui/Callout.astro';
-import Tabs from '../../../components/ui/Tabs.astro';
-import TabItem from '../../../components/ui/TabItem.astro';
-import Steps from '../../../components/ui/Steps.astro';
-import Quote from '../../../components/ui/Quote.astro';
-import ProsCons from '../../../components/ui/ProsCons.astro';
-import YouTube from '../../../components/ui/YouTube.astro';
-import LinkCard from '../../../components/ui/LinkCard.astro';
-import Divider from '../../../components/ui/Divider.astro';
-import Figure from '../../../components/ui/Figure.astro';
+import Callout from "../../../components/ui/Callout.astro";
+import Tabs from "../../../components/ui/Tabs.astro";
+import TabItem from "../../../components/ui/TabItem.astro";
+import Steps from "../../../components/ui/Steps.astro";
+import Quote from "../../../components/ui/Quote.astro";
+import ProsCons from "../../../components/ui/ProsCons.astro";
+import YouTube from "../../../components/ui/YouTube.astro";
+import LinkCard from "../../../components/ui/LinkCard.astro";
+import Divider from "../../../components/ui/Divider.astro";
+import Figure from "../../../components/ui/Figure.astro";
 
 In this chapter, we'll explore **advanced markdown features** and a **reusable MDX component system** that make technical documentation shine.
 
@@ -26,40 +26,38 @@ In this chapter, we'll explore **advanced markdown features** and a **reusable M
 Sometimes you need to grab the reader's attention quickly. Maybe a dependency is deprecated, or there is a security vulnerability they should be aware of. Instead of bold text, we use a universal `<Callout />` component.
 
 <Callout type="note">
-**Did you know?** The latest version of Astro lets you use plain `markdown` alongside `mdx` files seamlessly within your collections.
+  **Did you know?** The latest version of Astro lets you use plain `markdown`
+  alongside `mdx` files seamlessly within your collections.
 </Callout>
 
 <Callout type="tip" title="Pro Tip: Use TypeScript">
-When writing complex framework components, leveraging TypeScript can heavily reduce run-time errors by catching prop validation issues early.
+  When writing complex framework components, leveraging TypeScript can heavily
+  reduce run-time errors by catching prop validation issues early.
 </Callout>
 
 <Callout type="warning" title="Breaking Change">
-After migrating from Astro v3 to v5, ensure your `content.config.ts` has been correctly updated to use `astro:content`.
+  After migrating from Astro v3 to v5, ensure your `content.config.ts` has been
+  correctly updated to use `astro:content`.
 </Callout>
 
 <Callout type="danger" title="Heads up">
-Never commit secrets to your repository. Use environment variables and a secrets manager.
+  Never commit secrets to your repository. Use environment variables and a
+  secrets manager.
 </Callout>
 
 ## Interactive Installation Guides
 
 Top-tier docs offer `npm`, `pnpm`, and `yarn` installation options. With our custom `<Tabs>` component, providing this is frictionless:
 
-<Tabs tabs={['npm', 'pnpm', 'yarn']}>
+<Tabs tabs={["npm", "pnpm", "yarn"]}>
   <TabItem>
-    ```bash frame="terminal"
-    npm install @astrojs/mdx astro-expressive-code
-    ```
+    ```bash frame="terminal" npm install @astrojs/mdx astro-expressive-code ```
   </TabItem>
   <TabItem>
-    ```bash frame="terminal"
-    pnpm add @astrojs/mdx astro-expressive-code
-    ```
+    ```bash frame="terminal" pnpm add @astrojs/mdx astro-expressive-code ```
   </TabItem>
   <TabItem>
-    ```bash frame="terminal"
-    yarn add @astrojs/mdx astro-expressive-code
-    ```
+    ```bash frame="terminal" yarn add @astrojs/mdx astro-expressive-code ```
   </TabItem>
 </Tabs>
 
@@ -69,16 +67,16 @@ Instead of a standard unordered list, the `<Steps>` component renders a clear ve
 
 <Steps>
   <div>
-    ### Initialize your project
-    Run `npm create astro@latest` and choose the blog template to instantly scaffold a highly optimized site.
+    ### Initialize your project Run `npm create astro@latest` and choose the
+    blog template to instantly scaffold a highly optimized site.
   </div>
   <div>
-    ### Add MDX
-    Run `npx astro add mdx` to install the official MDX integration into your content layer.
+    ### Add MDX Run `npx astro add mdx` to install the official MDX integration
+    into your content layer.
   </div>
   <div>
-    ### Write components
-    Drop reusable `.astro` components into `src/components/ui/` and import them inside any `.mdx` chapter.
+    ### Write components Drop reusable `.astro` components into
+    `src/components/ui/` and import them inside any `.mdx` chapter.
   </div>
 </Steps>
 
@@ -88,7 +86,7 @@ Instead of a standard unordered list, the `<Steps>` component renders a clear ve
 
 Code fences support **titles**, **line highlights**, **diff markers**, and a **copy button** — powered by [Expressive Code](https://expressive-code.com/).
 
-### Astro Page with Highlights
+### Astro Page with <mark>Highlights</mark>
 
 ```tsx title="src/pages/index.astro" {1,3-4} ins={5} del={6}
 ---
@@ -103,53 +101,10 @@ const all = posts;
 </Layout>
 ```
 
-### Rust — Performance Critical Code
-
-```rust title="src/concurrent/sharded_map.rs" {22-26}
-/// A concurrent hash map using sharding
-use std::sync::{Arc, RwLock};
-use std::collections::HashMap;
-
-struct ShardedMap<K: Eq + Hash + Clone, V: Clone> {
-    shards: Arc<Vec<RwLock<HashMap<K, V>>>>,
-    num_shards: usize,
-}
-
-impl<K: Eq + Hash + Clone, V: Clone> ShardedMap<K, V> {
-    fn new(num_shards: usize) -> Self {
-        let mut shards = Vec::with_capacity(num_shards);
-        for _ in 0..num_shards {
-            shards.push(RwLock::new(HashMap::new()));
-        }
-        Self {
-            shards: Arc::new(shards),
-            num_shards,
-        }
-    }
-
-    fn get(&self, key: &K) -> Option<V> {
-        let shard_idx = self.hash(key);
-        let shard = self.shards[shard_idx].read().unwrap();
-        shard.get(key).cloned()
-    }
-
-    fn insert(&self, key: K, value: V) -> Option<V> {
-        let shard_idx = self.hash(&key);
-        let mut shard = self.shards[shard_idx].write().unwrap();
-        shard.insert(key, value)
-    }
-
-    fn hash<Q: Hash>(&self, key: &Q) -> usize {
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        key.hash(&mut hasher);
-        (hasher.finish() as usize) % self.num_shards
-    }
-}
-```
-
 <Quote author="Chris Coyier" title="Co-founder of CodePen">
-MDX is a format that lets you seamlessly write JSX in your Markdown documents. You can import components, such as interactive charts or alerts, and embed them within your content.
+  MDX is a format that lets you seamlessly write JSX in your Markdown documents.
+  You can import components, such as interactive charts or alerts, and embed
+  them within your content.
 </Quote>
 
 ## Mathematics (KaTeX)
@@ -180,15 +135,15 @@ $$
 
 ### Feature Comparison Matrix
 
-| Feature | PyTorch | TensorFlow | JAX | NumPy |
-|---------|---------|------------|-----|-------|
-| **Dynamic Graph** | ✅ | ⚠️ (TF 2.x) | ✅ | N/A |
-| **GPU Support** | ✅ | ✅ | ✅ | ⚠️ (via CuPy) |
-| **AutoDiff** | ✅ | ✅ | ✅ | ❌ |
-| **TPU Support** | ❌ | ✅ | ✅ | ❌ |
-| **Production** | ⚠️ | ✅ | ⚠️ | ❌ |
-| **Research** | ✅ | ⚠️ | ✅ | ✅ |
-| **Learning Curve** | Easy | Moderate | Hard | Easiest |
+| Feature            | PyTorch | TensorFlow  | JAX  | NumPy         |
+| ------------------ | ------- | ----------- | ---- | ------------- |
+| **Dynamic Graph**  | ✅      | ⚠️ (TF 2.x) | ✅   | N/A           |
+| **GPU Support**    | ✅      | ✅          | ✅   | ⚠️ (via CuPy) |
+| **AutoDiff**       | ✅      | ✅          | ✅   | ❌            |
+| **TPU Support**    | ❌      | ✅          | ✅   | ❌            |
+| **Production**     | ⚠️      | ✅          | ⚠️   | ❌            |
+| **Research**       | ✅      | ⚠️          | ✅   | ✅            |
+| **Learning Curve** | Easy    | Moderate    | Hard | Easiest       |
 
 ## Highlighting Information
 
@@ -196,13 +151,13 @@ When reviewing frameworks or methodologies, a `ProsCons` list is invaluable for 
 
 <ProsCons
   pros={[
-    'Visually striking pages out-of-the-box',
-    'Higher reader engagement',
-    'Enforces consistent design system',
+    "Visually striking pages out-of-the-box",
+    "Higher reader engagement",
+    "Enforces consistent design system",
   ]}
   cons={[
-    'Slightly increases initial build time',
-    'Authors must remember component syntax',
+    "Slightly increases initial build time",
+    "Authors must remember component syntax",
   ]}
 />
 
@@ -231,7 +186,7 @@ When referencing external documentation, prefer a `<LinkCard>` over a bare hyper
 
 Gradient descent ((Gradient descent is an optimization algorithm used to minimize a function by iteratively moving in the direction of steepest descent — the negative of the gradient.)) is the foundation of modern deep learning.
 
-The learning rate ((The learning rate $\eta$ controls how much to adjust the model in response to the estimated error each step. Typical values: 0.001, 0.01, 0.1.)) is one of the most important hyperparameters.
+The learning rate ((The learning rate controls how much to adjust the model in response to the estimated error each step. Typical values: 0.001, 0.01, 0.1.)) is one of the most important hyperparameters.
 
 ## Further Reading
 

@@ -1,6 +1,6 @@
 ---
 title: "Memory Latency"
-pubDate: "2026-05-04"
+pubDate: "2026-04-10"
 published: true
 description: "Memory Latency"
 useKatex: false
