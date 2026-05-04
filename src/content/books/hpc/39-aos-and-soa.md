@@ -1,6 +1,6 @@
 ---
 title: "AoS and SoA"
-pubDate: "2026-05-04"
+pubDate: "2026-04-20"
 published: true
 description: "AoS and SoA"
 useKatex: false

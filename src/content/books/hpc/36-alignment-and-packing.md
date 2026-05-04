@@ -1,6 +1,6 @@
 ---
 title: "Alignment and Packing"
-pubDate: "2026-05-04"
+pubDate: "2026-04-13"
 published: true
 description: "Alignment and Packing"
 useKatex: false

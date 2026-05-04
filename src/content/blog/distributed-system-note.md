@@ -1,6 +1,6 @@
 ---
 title: "Hệ thống phân tán: Ghi chú cơ bản"
-pubDate: "2026-05-04"
+pubDate: "2025-10-03"
 published: true
 contents_table: true
 pinned: false

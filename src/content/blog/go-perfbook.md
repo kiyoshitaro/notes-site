@@ -1,6 +1,6 @@
 ---
 title: "go-perfbook: Viết và Tối ưu hóa Code"
-pubDate: "2026-05-04"
+pubDate: "2026-03-12"
 published: true
 contents_table: true
 pinned: false

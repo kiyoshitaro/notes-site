@@ -1,6 +1,6 @@
 ---
 title: "Cache Associativity"
-pubDate: "2026-05-04"
+pubDate: "2026-04-16"
 published: true
 description: "Cache Associativity"
 useKatex: false

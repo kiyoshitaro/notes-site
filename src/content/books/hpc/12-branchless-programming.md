@@ -1,6 +1,6 @@
 ---
 title: "Branchless Programming"
-pubDate: "2026-05-04"
+pubDate: "2026-03-30"
 published: true
 description: "Branchless Programming"
 useKatex: false

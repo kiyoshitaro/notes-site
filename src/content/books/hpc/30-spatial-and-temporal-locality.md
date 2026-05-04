@@ -1,6 +1,6 @@
 ---
 title: "Spatial and Temporal Locality"
-pubDate: "2026-05-04"
+pubDate: "2026-04-10"
 published: true
 description: "Spatial and Temporal Locality"
 useKatex: false

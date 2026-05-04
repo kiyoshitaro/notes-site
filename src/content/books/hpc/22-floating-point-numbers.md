@@ -1,6 +1,6 @@
 ---
 title: "Floating-Point Numbers"
-pubDate: "2026-05-04"
+pubDate: "2026-04-02"
 published: true
 description: "Floating-Point Numbers"
 useKatex: false

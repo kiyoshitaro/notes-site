@@ -1,6 +1,6 @@
 ---
 title: "Indirect Branching"
-pubDate: "2026-05-04"
+pubDate: "2026-03-28"
 published: true
 description: "Indirect Branching"
 useKatex: false

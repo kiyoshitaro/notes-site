@@ -1,6 +1,6 @@
 ---
 title: "Dynamic Dispatch"
-pubDate: "2026-05-04"
+pubDate: "2026-03-28"
 published: true
 description: "Dynamic Dispatch"
 useKatex: false
