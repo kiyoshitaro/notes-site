@@ -269,17 +269,33 @@ article.post-plain :global(img[width]) {
 /* tweak typography on small screens if you like */
 @media (max-width: 600px) {
   :root {
-    --side-gutter: 0.1rem;  /* 50% of the original 1rem */
+    --side-gutter: 0.6rem;
   }
-  
+
+  .markdown-body {
+    line-height: 1.6;
+  }
+
   .post-title-main {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     margin-top: 0.5rem;
+    letter-spacing: -0.02em;
   }
-  .post-date-main {
-    font-size: 0.95rem;
+  .post-description {
+    font-size: 0.9rem;
+    line-height: 1.55;
   }
-  
+  .post-meta {
+    font-size: 0.78rem;
+  }
+  .post-subline {
+    margin-bottom: 1.25rem;
+  }
+
+  article.post-plain {
+    margin: 1.25rem auto;
+  }
+
   /* Better SVG handling for mobile */
   article.post-plain svg {
     height: auto !important;  /* Override any inline height */

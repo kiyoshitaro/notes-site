@@ -286,6 +286,80 @@
 @media (max-width: 600px) {
   .markdown-body {
     --media-max-width: 100%;
+    font-size: 0.94rem;
+    line-height: 1.6;
+  }
+
+  .markdown-body h1 {
+    font-size: 1.4rem;
+    margin-top: 1.4em;
+  }
+
+  .markdown-body h2 {
+    font-size: 1.2rem;
+  }
+
+  .markdown-body h3 {
+    font-size: 1.05rem;
+  }
+
+  .markdown-body h4 {
+    font-size: 0.98rem;
+  }
+
+  .markdown-body h5 {
+    font-size: 0.9rem;
+  }
+
+  .markdown-body h6 {
+    font-size: 0.86rem;
+  }
+
+  .markdown-body ul,
+  .markdown-body ol {
+    padding-left: 1.1em;
+    margin: 0.7em 0;
+  }
+
+  .markdown-body ul ul,
+  .markdown-body ol ol,
+  .markdown-body ul ol,
+  .markdown-body ol ul {
+    margin-left: 0;
+    padding-left: 1em;
+  }
+
+  .markdown-body li {
+    margin: 0.15em 0;
+  }
+
+  .markdown-body blockquote {
+    margin: 1em 0;
+    padding: 0.4em 0 0.4em 0.6em;
+  }
+
+  .markdown-body pre:not(:where(.expressive-code *)) {
+    padding: 0.7em 0.8em;
+    margin: 1em -0.4em;
+    border-radius: 6px;
+  }
+
+  .markdown-body pre:not(:where(.expressive-code *)) code {
+    font-size: 0.78em;
+  }
+
+  .markdown-body :not(pre) > code {
+    font-size: 0.82em;
+  }
+
+  .markdown-body .callout {
+    padding: 0.5em 0.7em;
+  }
+
+  .sidenote {
+    margin: 0.3em 0 0.3em 0.5em;
+    padding: 0.35em 0.6em;
+    font-size: 0.82rem;
   }
 }
 
