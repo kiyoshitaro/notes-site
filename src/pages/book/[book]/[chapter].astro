@@ -1,6 +1,7 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import Comments from '../../../components/Comments.astro';
+import ReadingProgress from '../../../components/ReadingProgress.astro';
 import { getCollection, render } from 'astro:content';
 import galleryScriptUrl from '../../../scripts/gallery.ts?url';
 import { resolveBookFromDocs } from '../../../lib/books';
@@ -456,6 +457,7 @@ const siteUrl = new URL('/', Astro.site).toString();
     ],
   }}
 >
+  <ReadingProgress target="article.chapter-plain" />
   <main class="book-shell">
     <aside class="book-sidebar" aria-label="Book chapters">
       <div class="book-sidebar-inner">
