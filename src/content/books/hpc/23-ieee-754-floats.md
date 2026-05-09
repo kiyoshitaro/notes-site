@@ -58,3 +58,115 @@ Cách CPU xử lý ngoại lệ khi xảy ra lỗi số học:
 Cơ chế này phức tạp và khá chậm, không phù hợp cho hệ thống thời gian thực (ví dụ: điều khiển tên lửa).
 
 ...
+
+## Bài tập
+
+### Câu hỏi tư duy
+
+1. Tại sao `0.1 + 0.2 != 0.3` trong float? Giải thích bằng binary representation của 0.1.
+2. So sánh `==` giữa hai float có an toàn không? Khi nào dùng được, khi nào phải dùng epsilon?
+3. Một function tính `(a + b) + c` và `a + (b + c)` có cho cùng kết quả với double không? Giải thích tại sao FP không associative.
+4. `bfloat16` có cùng exponent range như `float32` nhưng ít mantissa hơn. Trade-off đó ảnh hưởng gì đến training mạng neural? Tại sao ML chấp nhận được?
+5. Subnormal (denormal) numbers là gì? Tại sao chúng làm code chậm 100x trên một số CPU?
+6. NaN có những property kỳ lạ nào? `NaN == NaN` trả về gì? Cách check NaN đúng?
+
+### Bài tập code
+
+**Bài 1**: Viết function so sánh 2 float "gần bằng nhau" với epsilon hợp lý:
+```c
+bool nearly_equal(float a, float b);
+```
+
+**Bài 2**: Tính tổng `1/i` cho i = 1..10^7 hai cách:
+- (a) Forward: `s += 1.0/i` from i=1 to N.
+- (b) Backward: `s += 1.0/i` from i=N to 1.
+
+Cái nào chính xác hơn? Tại sao? So sánh kết quả với double precision summation.
+
+**Bài 3**: Đo throughput của một loop có subnormal numbers vs normal numbers. Set FTZ (flush-to-zero) flag bằng `_MM_SET_FLUSH_ZERO_MODE`, đo lại.
+
+## Đáp án
+
+### Câu hỏi tư duy
+
+1. `0.1` không có binary representation chính xác — giống như `1/3` trong base-10 = `0.3333...`. Trong binary, `0.1` ≈ `0.0001100110011...` (lặp vô hạn). Float lưu được ~7 digit chính xác → 0.1 thực tế ~ `0.10000000149011612`. Cộng 2 số xấp xỉ → kết quả xấp xỉ ≠ 0.3 (cũng xấp xỉ).
+
+2. `==` an toàn khi: cả hai là kết quả của exact operations (e.g., gán literal int rồi convert), hoặc khi check special values (0.0, infinity, NaN). Không an toàn khi: kết quả của arithmetic, conversion, parsing. Dùng `|a-b| < epsilon * max(|a|,|b|)` (relative) hoặc ULPs comparison cho robust check.
+
+3. `(a+b)+c ≠ a+(b+c)` khi exponent khác nhau lớn. Ví dụ: `a=1e20, b=-1e20, c=1` → `(a+b)+c = 0+1 = 1`, `a+(b+c) = 1e20-1e20 = 0` (vì `1e20+1` = `1e20` do round-off). Đây là lý do `-O3` không tự reorder FP ops; cần `-ffast-math`.
+
+4. bfloat16: 1 sign + 8 exp + 7 mantissa. Range giống float32 (cùng 8 exp bit), precision thấp hơn (~3 decimal digit). ML chấp nhận được vì gradient noise lớn hơn floating-point error nhiều. Range quan trọng hơn precision — gradient có thể rất nhỏ hoặc rất lớn. fp16 có range hẹp → dễ underflow/overflow gradient → bfloat16 thắng cho training.
+
+5. Subnormal: số rất nhỏ với exponent = 0, mantissa không normalized (không có hidden 1 bit). CPU thường handle subnormal qua microcode trap → chậm 50–100x. FTZ (flush-to-zero) làm subnormal → 0 → tránh trap. Quan trọng cho audio processing, simulation.
+
+6. NaN: `NaN != NaN` luôn true (NaN không bằng bất cứ gì, kể cả chính nó). Comparison với NaN luôn false. Check NaN: `isnan(x)` hoặc `x != x`. Bug điển hình: sort array có NaN → comparator return false cả 2 chiều → broken sort.
+
+### Bài tập code
+
+**Bài 1 — nearly_equal**:
+
+```c
+#include <math.h>
+#include <float.h>
+
+bool nearly_equal(float a, float b) {
+    if (a == b) return true;  // handle infinity, exact match
+    float diff = fabsf(a - b);
+    float norm = fminf(fabsf(a) + fabsf(b), FLT_MAX);
+    return diff < fmaxf(FLT_EPSILON, FLT_EPSILON * norm);
+}
+```
+
+Ý nghĩa: dùng relative epsilon khi |a|, |b| lớn; absolute epsilon khi gần 0. `FLT_MAX` clamp tránh overflow khi a+b = inf.
+
+**Bài 2 — forward vs backward summation**:
+
+Backward chính xác hơn. Lý do: forward bắt đầu với `s=1` (lớn), cộng `1/i` rất nhỏ → `s + 1/i ≈ s` (lost precision). Backward bắt đầu với số nhỏ `1/N` cộng với số nhỏ → giữ precision tốt hơn.
+
+```c
+double sum_forward(int N) {
+    double s = 0;
+    for (int i = 1; i <= N; i++) s += 1.0 / i;
+    return s;
+}
+
+double sum_backward(int N) {
+    double s = 0;
+    for (int i = N; i >= 1; i--) s += 1.0 / i;
+    return s;
+}
+```
+
+Với N=10^7, sum thực ≈ 16.6953. Backward chính xác đến ~12 digits, forward ~10 digits. Kahan summation cho cả hai version chính xác như nhau (~15 digits).
+
+```c
+double sum_kahan(int N) {
+    double s = 0, c = 0;  // c: compensation
+    for (int i = 1; i <= N; i++) {
+        double y = 1.0/i - c;
+        double t = s + y;
+        c = (t - s) - y;
+        s = t;
+    }
+    return s;
+}
+```
+
+**Bài 3 — subnormal slowdown**:
+
+```c
+#include <xmmintrin.h>  // SSE
+#include <pmmintrin.h>  // SSE3
+
+// Bật FTZ + DAZ (Flush-To-Zero + Denormals-Are-Zero)
+_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+_MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+
+// Loop với subnormals
+float arr[N] = { 1e-39f, 1e-39f, ... };  // subnormal range
+for (int i = 0; i < N; i++) sum += arr[i] * arr[i];
+```
+
+Trên Intel Skylake, subnormal multiply có thể chậm 50–100x. Bật FTZ → subnormal flush thành 0 → speed gần normal. Audio engines (real-time) thường bật FTZ globally.
+
+

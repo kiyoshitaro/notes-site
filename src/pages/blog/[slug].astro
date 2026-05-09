@@ -2,6 +2,7 @@
 // layout + content loading
 import Layout from '../../layouts/Layout.astro';
 import Comments from '../../components/Comments.astro';
+import ReadingProgress from '../../components/ReadingProgress.astro';
 import { getCollection, render } from 'astro:content';
 import galleryScriptUrl from '../../scripts/gallery.ts?url';
 
@@ -220,9 +221,85 @@ pre {
 .toc-d2 a { padding-left: 0.6rem; }
 .toc-d3 a { padding-left: 1.2rem; }
 
-/* Hidden on mobile/narrow screens */
+.toc-mobile-toggle {
+  display: none;
+  position: fixed;
+  left: clamp(1rem, 3vw, 1.75rem);
+  bottom: clamp(1rem, 3vw, 1.75rem);
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-soft);
+  color: var(--fg);
+  cursor: pointer;
+  z-index: 150;
+  place-items: center;
+  box-shadow: 0 6px 18px rgba(var(--shadow-rgb), 0.22);
+}
+
+.toc-mobile-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.toc-mobile-toggle:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.5);
+  outline-offset: 2px;
+}
+
+.toc-mobile-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 199;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.toc-mobile-backdrop.is-open {
+  display: block;
+  opacity: 1;
+}
+
+/* Mobile/narrow screens: convert rail to slide-in drawer */
 @media (max-width: 1024px) {
-  .toc-rail { display: none; }
+  .toc-rail {
+    top: 0;
+    bottom: 0;
+    transform: translateX(-100%);
+    height: 100vh;
+    width: min(320px, 86vw);
+    max-width: none;
+    padding: 1.2rem;
+    background: var(--bg);
+    border-right: 1px solid var(--border-soft);
+    border-radius: 0;
+    box-shadow: 4px 0 24px rgba(var(--shadow-rgb), 0.28);
+    overflow-y: auto;
+    transition: transform 0.25s ease;
+    z-index: 200;
+  }
+
+  .toc-rail.is-open {
+    transform: translateX(0);
+  }
+
+  .toc-rail:hover {
+    width: min(320px, 86vw);
+    background: var(--bg);
+    box-shadow: 4px 0 24px rgba(var(--shadow-rgb), 0.28);
+    padding: 1.2rem;
+  }
+
+  .toc-rail .toc-label {
+    opacity: 1;
+  }
+
+  .toc-mobile-toggle {
+    display: grid;
+  }
 }
 
 /* Perfect centering wrapper */
@@ -269,17 +346,33 @@ article.post-plain :global(img[width]) {
 /* tweak typography on small screens if you like */
 @media (max-width: 600px) {
   :root {
-    --side-gutter: 0.1rem;  /* 50% of the original 1rem */
+    --side-gutter: 0.6rem;
   }
-  
+
+  .markdown-body {
+    line-height: 1.6;
+  }
+
   .post-title-main {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     margin-top: 0.5rem;
+    letter-spacing: -0.02em;
   }
-  .post-date-main {
-    font-size: 0.95rem;
+  .post-description {
+    font-size: 0.9rem;
+    line-height: 1.55;
   }
-  
+  .post-meta {
+    font-size: 0.78rem;
+  }
+  .post-subline {
+    margin-bottom: 1.25rem;
+  }
+
+  article.post-plain {
+    margin: 1.25rem auto;
+  }
+
   /* Better SVG handling for mobile */
   article.post-plain svg {
     height: auto !important;  /* Override any inline height */
@@ -312,8 +405,26 @@ article.post-plain :global(img[width]) {
     ],
   }}
 >
+  <ReadingProgress target="article.post-plain" />
   {showTocRail && (
-    <nav class="toc-rail" aria-label="Table of contents">
+    <button
+      type="button"
+      class="toc-mobile-toggle"
+      data-toc-toggle
+      aria-label="Open table of contents"
+      aria-expanded="false"
+      aria-controls="toc-rail"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="4" y1="6" x2="20" y2="6"></line>
+        <line x1="4" y1="12" x2="14" y2="12"></line>
+        <line x1="4" y1="18" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  )}
+  {showTocRail && <div class="toc-mobile-backdrop" data-toc-backdrop aria-hidden="true"></div>}
+  {showTocRail && (
+    <nav id="toc-rail" class="toc-rail" aria-label="Table of contents">
       <ol class="toc-entries">
         <li class="toc-entry toc-entry-title" data-target="top">
           <a href="#">
@@ -350,6 +461,28 @@ article.post-plain :global(img[width]) {
     </article>
   </div>
   <script type="module" src={galleryScriptUrl}></script>
+  <script>
+    const tocRail = document.getElementById('toc-rail');
+    const tocToggle = document.querySelector('[data-toc-toggle]');
+    const tocBackdrop = document.querySelector('[data-toc-backdrop]');
+    const closeToc = () => {
+      tocRail?.classList.remove('is-open');
+      tocBackdrop?.classList.remove('is-open');
+      tocToggle?.setAttribute('aria-expanded', 'false');
+    };
+    const openToc = () => {
+      tocRail?.classList.add('is-open');
+      tocBackdrop?.classList.add('is-open');
+      tocToggle?.setAttribute('aria-expanded', 'true');
+    };
+    tocToggle?.addEventListener('click', () => {
+      tocRail?.classList.contains('is-open') ? closeToc() : openToc();
+    });
+    tocBackdrop?.addEventListener('click', closeToc);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeToc();
+    });
+  </script>
   <script>
     const tocEntries = [...document.querySelectorAll('.toc-entry')];
     if (tocEntries.length) {
@@ -422,6 +555,13 @@ article.post-plain :global(img[width]) {
             if (!heading) return;
             heading.scrollIntoView({ block: 'start' });
           }
+
+          const rail = document.getElementById('toc-rail');
+          const backdrop = document.querySelector('[data-toc-backdrop]');
+          const toggle = document.querySelector('[data-toc-toggle]');
+          rail?.classList.remove('is-open');
+          backdrop?.classList.remove('is-open');
+          toggle?.setAttribute('aria-expanded', 'false');
         });
       }
     }
