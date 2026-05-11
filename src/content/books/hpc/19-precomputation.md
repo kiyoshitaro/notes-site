@@ -16,7 +16,7 @@ Chương trình chạy nhanh hơn vì không phải tính toán lúc chạy , nh
 
 ### Constant Expressions
 Khi một hàm được đánh dấu constexpr và gọi với giá trị hằng số, compiler bắt buộc phải tính tại compile-time.
-```C
+```c
 constexpr int fibonacci(int n) {
     if (n <= 2)
         return 1;
@@ -34,7 +34,7 @@ Hạn chế của constexpr
 * Dù không tốn chi phí lúc chạy, nhưng tăng thời gian biên dịch → tránh viết thuật toán quá phức tạp (ví dụ NP-complete).
 
 Từ C++17: có thể viết theo imperative style (dùng vòng lặp, mảng, biến trạng thái) => giúp tạo lookup table (bảng tra cứu) ngay tại compile-time.
-```C
+```c
 struct Precalc {
     int isqrt[1000];
 

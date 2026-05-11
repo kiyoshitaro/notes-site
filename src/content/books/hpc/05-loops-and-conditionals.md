@@ -20,7 +20,7 @@ useKatex: false
     * Vấn đề: mỗi vòng lặp chỉ có 1 lệnh hữu ích, còn lại là kiểm tra và tăng biến.
     * Giải pháp: gộp nhiều lần lặp vào một vòng → giảm overhead.
 
-    ```C
+    ```c
     loop:
     add  edx, [rax]
     add  edx, [rax+4]

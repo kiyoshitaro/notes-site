@@ -10,7 +10,7 @@ useKatex: false
 
 Đơn vị cơ bản để truyền tải dữ liệu trong hệ thống cache của CPU không phải là từng bit hay từng byte riêng lẻ, mà là cache lines, hầu hết các kiến trúc máy tính hiện nay, kích thước của một cache line là 64 byte. Điều này có nghĩa là toàn bộ bộ nhớ được chia thành các khối 64 byte
 
-```C
+```c
 for (int i = 0; i < N; i += D)
     a[i]++;
 ```

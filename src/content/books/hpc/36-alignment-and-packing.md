@@ -12,7 +12,7 @@ Bộ nhớ máy tính được chia thành các cache line kích thước 64 byt
 
 ### Aligned Allocation
 VD: Compiler luôn đảm bảo địa chỉ của các phần tử luôn là bội số của kích thước phần tử để mỗi phần tử chỉ nằm trong 1 dòng cache. 
-```C
+```c
 alignas(32) float a[n];
 void *a = std::aligned_alloc(32, 4 * n);
 struct alignas(64) Data {

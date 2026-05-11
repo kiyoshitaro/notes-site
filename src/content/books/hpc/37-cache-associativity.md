@@ -8,7 +8,7 @@ useKatex: false
 
 # Cache Associativity
 
-```C
+```c
 // for (int i = 0; i < N; i += 256)
 for (int i = 0; i < N; i += 257)
     a[i]++;

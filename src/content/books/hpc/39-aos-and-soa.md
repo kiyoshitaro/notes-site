@@ -11,7 +11,7 @@ useKatex: false
 - Array of Structures (AoS): Mỗi phần tử là một “struct” chứa nhiều trường => struct được đặt liên tiếp nhau trong bộ nhớ
 - Structure of Arrays (SoA): Mỗi trường được tách thành một mảng riêng => Khi cần xử lý một trường trên toàn bộ dữ liệu, SoA rất tiện. Nhưng nếu cần nhiều trường cùng lúc, phải nạp nhiều cache line hơn → chậm hơn.
 
-```C
+```c
 const int M = N / D; // số lần truy cập bộ nhớ
 int p[M], q[M][D];
 // int p[M], int q[D][M];   
