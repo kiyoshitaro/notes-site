@@ -13,7 +13,7 @@ useKatex: false
     * Switch-case: giúp code gọn hơn nhưng bản chất vẫn là nhiều nhánh kiểm tra tuần tự
     * Tối ưu bằng bảng nhảy (branch table): Thay vì kiểm tra từng điều kiện, ta có thể tạo một mảng chứa địa chỉ nhảy, chỉ số của mảng chính là giá trị biến trạng thái.
     * 👉 bảng nhảy giúp loại bỏ chuỗi kiểm tra dài, tăng tốc độ xử lý. Multiway Branch đặc biệt hữu ích khi có nhiều trạng thái lặp lại (số nhánh nhiều (10–100 case)), như trong game, trình biên dịch, hoặc hệ thống điều khiển.
-        ```C
+        ```c
         void weather_in_russia(int season) {
             static const void* table[] = {&&winter, &&spring, &&summer, &&fall};
             goto *table[season];

@@ -24,7 +24,7 @@ Chuẩn bị môi trường
 - Các kiểu dữ liệu: __m128 (__m128d, __m128i), __m256, __m512
 - Intrinsics: 
     Intrinsics là hàm C ánh xạ trực tiếp tới lệnh assembly, ví dụ cộng hai mảng double bằng AVX2:
-    ```C
+    ```c
     for (int i = 0; i < 100; i += 4) {
         __m256d x = _mm256_loadu_pd(&a[i]);
         __m256d y = _mm256_loadu_pd(&b[i]);

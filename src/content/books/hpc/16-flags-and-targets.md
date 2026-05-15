@@ -38,7 +38,7 @@ useKatex: false
 
 ### Multiversioned Functions
 Đôi khi viết nhiều phiên bản của cùng một hàm, để compiler tự chọn phiên bản phù hợp với CPU: 
-```C
+```c
 __attribute__(( target("default") )) // phiên bản mặc định
 int popcnt(int x) {
     int s = 0;

@@ -18,7 +18,7 @@ Kể cả ở mức tối ưu hóa như -O2 hoặc -O3, 1 số tối ưu hóa kh
 * Trình biên dịch tự quyết định có inline hay không. gợi ý bằng từ khóa inline hoặc ép buộc #define FORCE_INLINE inline __attribute__((always_inline))
 
 ### Likeliness of Branches
-```C
+```c
 int factorial(int n) {
     if (n > 1) [[likely]]
         return n * factorial(n - 1);

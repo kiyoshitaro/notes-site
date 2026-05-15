@@ -26,14 +26,14 @@ Ví dụ:
     * C++ có [] (không an toàn) và .at() (an toàn, có kiểm tra).
 
 * Dịch bit quá số lượng
-    ```C
+    ```c
     int a = 1 << 40; // UB
     ```
     * Trên x86, kết quả khác với ARM. Nếu chuẩn hóa, compiler phải thêm kiểm tra → tốn hiệu năng. UB cho phép compiler bỏ qua kiểm tra, giả định bạn không làm điều vô lý này
 
 ### 📜 C++ Contracts
 Có 3 loại: expects (điều kiện đầu vào), ensures (điều kiện đầu ra), assert (khẳng định trong code). 
-```C
+```c
 int mod_power_of_two(int x, int m)
     [[ expects: x >= 0 ]]
     [[ expects: is_power_of_two(m) ]]

@@ -15,7 +15,7 @@ useKatex: false
 * Hot Loops: Nếu các lệnh độc lập với nhau (như cộng dồn một mảng lớn), hãy nhìn vào cột Throughput. Mục tiêu là không để bộ thực thi nào bị quá tải trong khi các bộ khác đang rảnh.
 
 * Example: 
-    ```C
+    ```c
     int s = 0;
 
     for (int i = 0; i < n; i++)
@@ -23,7 +23,7 @@ useKatex: false
     ```
     * Giả sử trong giây lát rằng trình biên dịch không vector hóa vòng lặp này. RThroughput của add là 2 trên CPU Zen 2, có nghĩa là ta có thể thực hiện 2 add mỗi chu kỳ. Nhưng với loop này điều này là không thể: s đang được sử dụng để tích lũy phần tử  i-th, nó không thể được sử dụng cho (i+1)-th trong ít nhất một chu kỳ.
     * Giải pháp là sử dụng 2 accumulators và chỉ cần tổng hợp các phần tử lẻ và chẵn riêng biệt:
-        ```C
+        ```c
         int s0 = 0, s1 = 0;
         s0 += a[0];
         s1 += a[1];

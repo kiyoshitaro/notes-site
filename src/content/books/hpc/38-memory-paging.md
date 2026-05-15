@@ -10,7 +10,7 @@ useKatex: false
 
 Cách cache và TLB ảnh hưởng đến hiệu năng khi truy cập mảng lớn với bước nhảy (stride) khác nhau
 
-```C
+```c
 const int N = (1 << 13);
 int a[D * N];
 
@@ -25,7 +25,7 @@ for (int i = 0; i < D * N; i += D)
   - L2 TLB: 2048 entries → quản lý 2048 × 4 KB = 8 MB
 - Nếu D lớn hơn 256, mảng chiếm > 8 MB vượt quá khả năng của L2 TLB, CPU phải tra cứu page table trong RAM, rất chậm
 - ==> Tăng Page Size: huge pages bằng cách chỉnh file /sys/kernel/mm/transparent_hugepage/enabled hoặc dùng system call madvise
-    ```C
+    ```c
     #include <sys/mman.h>
     void *ptr = std::aligned_alloc(page_size, array_size);
     madvise(ptr, array_size, MADV_HUGEPAGE);

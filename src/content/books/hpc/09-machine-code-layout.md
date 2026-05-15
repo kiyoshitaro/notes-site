@@ -29,7 +29,7 @@ Thông thường, chúng ta hay nghĩ CPU chậm là do tính toán (Back-end), 
     * Lệnh cũng được lưu trong Cache giống như dữ liệu. Nhưng nếu code quá lớn (do lạm dụng Inlining hoặc Unrolling vòng lặp), nó sẽ làm tràn Cache lệnh (I-Cache) => Nên trình biên dịch se gom nhóm "hot code" ở cạnh nhau và đẩy "cold code" ra xa để tối ưu hóa bộ nhớ đệm.
 * Unequal Branches
 
-    ```C
+    ```c
     int length(int x, int y) {
         if (x > y)
             return x - y;
@@ -57,7 +57,7 @@ Thông thường, chúng ta hay nghĩ CPU chậm là do tính toán (Back-end), 
     * Nhánh x > y: CPU chạy thẳng từ trên xuống dưới (5 lệnh) rồi gặp ret là xong. Nếu các lệnh này nằm gọn trong một khối nạp (fetch block), nó sẽ cực nhanh
     * Nhánh x <= y: CPU phải thực hiện một cú nhảy (jle) để đến chỗ tính toán, sau đó lại tốn thêm một cú nhảy nữa (jmp done) để thoát. Mỗi cú nhảy đều có nguy cơ làm gián đoạn luồng nạp lệnh của Front-end.
     * ví dụ trường hợp x > y là rất hiếm => có thể tối ưu bằng cách sử dụng hàm swap 
-        ```C
+        ```c
         int length(int x, int y) {
             if (x > y) [[unlikely]]
                 swap(x, y);
@@ -75,7 +75,7 @@ Thông thường, chúng ta hay nghĩ CPU chậm là do tính toán (Back-end), 
             ret
         ```
     * code ngắn hơn (6 lệnh) nhưng lệnh xchg (đổi chỗ) vẫn nằm đó, chiếm chỗ trong khối nạp lệnh (fetch block) dù nó hiếm khi được dùng -> them [[unlikely]] để trình biên dịch sẽ tự động sắp xếp Assembly để nhánh phổ biến nhất nằm ở vị trí "chạy thẳng"
-        ```C
+        ```c
         int length(int x, int y) {
             if (x > y) [[unlikely]]
                 swap(x, y);

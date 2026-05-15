@@ -16,7 +16,7 @@ export async function getStaticPaths() {
 
 const { post } = Astro.props;
 const { Content, headings } = await render(post);
-const tocHeadings = headings.filter(heading => heading.depth >= 1 && heading.depth <= 3);
+const tocHeadings = headings.filter(heading => heading.depth >= 1 && heading.depth <= 6);
 const showTocRail = tocHeadings.length >= 3;
 
 const parseLocalDate = (dateString: string) => {
@@ -137,8 +137,181 @@ pre {
   width: 24px;
   padding: 1.2rem 0 1.2rem 0.4rem;
   transition: width 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: calc(100vh - 2rem);
   border-radius: 0 8px 8px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  overscroll-behavior: contain;
+}
+
+.toc-rail::-webkit-scrollbar {
+  width: 6px;
+}
+.toc-rail::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+.toc-rail::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Hide scrollbar when collapsed (24px wide) — only show on hover / when expanded / pinned */
+.toc-rail:not(:hover):not(.is-open):not(.toc-pinned) {
+  scrollbar-width: none;
+}
+.toc-rail:not(:hover):not(.is-open):not(.toc-pinned)::-webkit-scrollbar {
+  display: none;
+}
+
+/* Pin + hide controls */
+.toc-controls {
+  display: none;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+.toc-rail:hover .toc-controls,
+.toc-rail.is-open .toc-controls,
+.toc-rail.toc-pinned .toc-controls {
+  display: flex;
+}
+.toc-ctrl-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--fg-muted);
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+}
+.toc-ctrl-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.toc-ctrl-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.toc-ctrl-btn[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+.toc-ctrl-btn:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.5);
+  outline-offset: 2px;
+}
+
+/* Pinned: stay expanded permanently (desktop) */
+.toc-rail.toc-pinned {
+  width: 280px;
+  background: var(--bg);
+  box-shadow: 2px 0 16px rgba(var(--shadow-rgb), 0.24);
+  padding: 1.2rem 0.8rem 1.2rem 0.8rem;
+}
+.toc-rail.toc-pinned .toc-label {
+  opacity: 1;
+}
+
+/* Hidden / dismissed state */
+.toc-rail.toc-dismissed {
+  display: none;
+}
+/* When dismissed, also hide the mobile floating toggle button to avoid confusion */
+.toc-rail.toc-dismissed ~ .toc-mobile-toggle {
+  display: none;
+}
+
+/* Custom tooltip for truncated TOC labels — shows full text on hover.
+   Only applied to entries marked with [data-truncated="true"] by JS. */
+.toc-entry[data-truncated="true"] {
+  position: relative;
+}
+.toc-entry[data-truncated="true"] a:hover .toc-label::after,
+.toc-entry[data-truncated="true"] a:focus-visible .toc-label::after {
+  content: attr(data-full-text);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  line-height: 1.4;
+  white-space: normal;
+  max-width: 320px;
+  width: max-content;
+  box-shadow: 0 4px 14px rgba(var(--shadow-rgb), 0.22);
+  z-index: 250;
+  pointer-events: none;
+  opacity: 0;
+  animation: toc-tooltip-fade 0.12s ease-out 0.25s forwards;
+}
+@keyframes toc-tooltip-fade {
+  to { opacity: 1; }
+}
+
+/* On mobile drawer, tooltip can collide with edge — anchor inside drawer */
+@media (max-width: 1024px) {
+  .toc-entry[data-truncated="true"] a:hover .toc-label::after,
+  .toc-entry[data-truncated="true"] a:focus-visible .toc-label::after {
+    left: 1rem;
+    right: 1rem;
+    top: 100%;
+    transform: none;
+    margin-top: 4px;
+    max-width: none;
+    width: auto;
+  }
+}
+
+/* Restore tab — small handle on left edge to bring TOC back */
+.toc-restore {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--border-soft);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  color: var(--fg-muted);
+  cursor: pointer;
+  z-index: 99;
+  padding: 0;
+  box-shadow: 2px 0 8px rgba(var(--shadow-rgb), 0.18);
+}
+.toc-restore.is-visible {
+  display: inline-flex;
+}
+.toc-restore:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.toc-restore svg {
+  width: 16px;
+  height: 16px;
+}
+.toc-restore:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.5);
+  outline-offset: 2px;
 }
 
 .toc-rail:hover {
@@ -179,9 +352,18 @@ pre {
 .toc-entry-title .toc-label { font-weight: 700; color: var(--fg); }
 .toc-entry-title { margin-bottom: 0.3rem; }
 
-.toc-d1 .toc-tick { width: 18px; }
-.toc-d2 .toc-tick { width: 11px; }
-.toc-d3 .toc-tick { width: 6px; }
+.toc-d1 .toc-tick { width: 20px; height: 2.5px; }
+.toc-d2 .toc-tick { width: 16px; }
+.toc-d3 .toc-tick { width: 12px; }
+.toc-d4 .toc-tick { width: 8px; }
+.toc-d5 .toc-tick { width: 5px; }
+.toc-d6 .toc-tick { width: 3px; }
+
+.toc-d1 .toc-label { font-weight: 600; color: var(--fg); }
+.toc-d2 .toc-label { font-weight: 500; }
+.toc-d4 .toc-label,
+.toc-d5 .toc-label,
+.toc-d6 .toc-label { font-size: 0.74rem; color: var(--fg-muted); }
 
 .toc-label {
   opacity: 0;
@@ -220,6 +402,9 @@ pre {
 /* Depth indentation (only visible when expanded) */
 .toc-d2 a { padding-left: 0.6rem; }
 .toc-d3 a { padding-left: 1.2rem; }
+.toc-d4 a { padding-left: 1.8rem; }
+.toc-d5 a { padding-left: 2.4rem; }
+.toc-d6 a { padding-left: 3rem; }
 
 .toc-mobile-toggle {
   display: none;
@@ -424,19 +609,64 @@ article.post-plain :global(img[width]) {
   )}
   {showTocRail && <div class="toc-mobile-backdrop" data-toc-backdrop aria-hidden="true"></div>}
   {showTocRail && (
+    <button
+      type="button"
+      class="toc-restore"
+      data-toc-restore
+      aria-label="Show table of contents"
+      title="Show TOC"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="8" y1="6" x2="20" y2="6"></line>
+        <line x1="8" y1="12" x2="20" y2="12"></line>
+        <line x1="8" y1="18" x2="20" y2="18"></line>
+        <circle cx="4" cy="6" r="1"></circle>
+        <circle cx="4" cy="12" r="1"></circle>
+        <circle cx="4" cy="18" r="1"></circle>
+      </svg>
+    </button>
+  )}
+  {showTocRail && (
     <nav id="toc-rail" class="toc-rail" aria-label="Table of contents">
+      <div class="toc-controls">
+        <button
+          type="button"
+          class="toc-ctrl-btn"
+          data-toc-pin
+          aria-label="Pin table of contents"
+          aria-pressed="false"
+          title="Pin"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 17v5"></path>
+            <path d="M9 10.76V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6.76l2 3.24H7l2-3.24z"></path>
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="toc-ctrl-btn"
+          data-toc-hide
+          aria-label="Hide table of contents"
+          title="Hide"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+            <line x1="6" y1="18" x2="18" y2="6"></line>
+          </svg>
+        </button>
+      </div>
       <ol class="toc-entries">
         <li class="toc-entry toc-entry-title" data-target="top">
-          <a href="#">
+          <a href="#" title={post.data.title} aria-label={post.data.title}>
             <span class="toc-tick"></span>
-            <span class="toc-label">{post.data.title}</span>
+            <span class="toc-label" data-full-text={post.data.title}>{post.data.title}</span>
           </a>
         </li>
         {tocHeadings.map(heading => (
           <li class={`toc-entry toc-d${heading.depth}`} data-target={heading.slug}>
-            <a href={`#${heading.slug}`}>
+            <a href={`#${heading.slug}`} title={heading.text} aria-label={heading.text}>
               <span class="toc-tick"></span>
-              <span class="toc-label">{heading.text}</span>
+              <span class="toc-label" data-full-text={heading.text}>{heading.text}</span>
             </a>
           </li>
         ))}
@@ -465,6 +695,74 @@ article.post-plain :global(img[width]) {
     const tocRail = document.getElementById('toc-rail');
     const tocToggle = document.querySelector('[data-toc-toggle]');
     const tocBackdrop = document.querySelector('[data-toc-backdrop]');
+    const tocPinBtn = document.querySelector('[data-toc-pin]');
+    const tocHideBtn = document.querySelector('[data-toc-hide]');
+    const tocRestoreBtn = document.querySelector('[data-toc-restore]');
+
+    const STORAGE_PIN = 'toc-pinned';
+    const STORAGE_HIDE = 'toc-hidden';
+
+    const applyPin = (pinned) => {
+      if (!tocRail) return;
+      tocRail.classList.toggle('toc-pinned', pinned);
+      tocPinBtn?.setAttribute('aria-pressed', String(pinned));
+    };
+
+    const applyHide = (hidden) => {
+      if (!tocRail) return;
+      tocRail.classList.toggle('toc-dismissed', hidden);
+      tocRestoreBtn?.classList.toggle('is-visible', hidden);
+    };
+
+    try {
+      applyPin(localStorage.getItem(STORAGE_PIN) === '1');
+      applyHide(localStorage.getItem(STORAGE_HIDE) === '1');
+    } catch {}
+
+    tocPinBtn?.addEventListener('click', () => {
+      const next = !tocRail?.classList.contains('toc-pinned');
+      applyPin(next);
+      try { localStorage.setItem(STORAGE_PIN, next ? '1' : '0'); } catch {}
+    });
+
+    tocHideBtn?.addEventListener('click', () => {
+      applyHide(true);
+      applyPin(false);
+      try {
+        localStorage.setItem(STORAGE_HIDE, '1');
+        localStorage.setItem(STORAGE_PIN, '0');
+      } catch {}
+    });
+
+    tocRestoreBtn?.addEventListener('click', () => {
+      applyHide(false);
+      try { localStorage.setItem(STORAGE_HIDE, '0'); } catch {}
+    });
+
+    /* Mark TOC entries whose label text overflows so CSS tooltip shows.
+       Re-run when rail width changes (collapse↔expand↔pin) since available width differs. */
+    const markTruncatedLabels = () => {
+      const entries = tocRail?.querySelectorAll('.toc-entry') ?? [];
+      entries.forEach((entry) => {
+        const label = entry.querySelector('.toc-label');
+        if (!label) return;
+        const truncated = label.scrollWidth > label.clientWidth + 1;
+        if (truncated) entry.setAttribute('data-truncated', 'true');
+        else entry.removeAttribute('data-truncated');
+      });
+    };
+    /* Measure after layout + fonts settle */
+    const scheduleTruncationCheck = () => {
+      requestAnimationFrame(() => requestAnimationFrame(markTruncatedLabels));
+    };
+    scheduleTruncationCheck();
+    if (document.fonts?.ready) document.fonts.ready.then(scheduleTruncationCheck);
+    window.addEventListener('resize', scheduleTruncationCheck);
+    /* Re-measure when rail transitions width (hover, pin, mobile open) */
+    tocRail?.addEventListener('transitionend', (e) => {
+      if (e.propertyName === 'width' || e.propertyName === 'transform') scheduleTruncationCheck();
+    });
+
     const closeToc = () => {
       tocRail?.classList.remove('is-open');
       tocBackdrop?.classList.remove('is-open');
@@ -501,11 +799,25 @@ article.post-plain :global(img[width]) {
       let scheduled = false;
       let lockUntil = 0;
 
+      const tocRailEl = document.getElementById('toc-rail');
+      const scrollActiveIntoView = (entry) => {
+        if (!entry || !tocRailEl) return;
+        const railRect = tocRailEl.getBoundingClientRect();
+        const entryRect = entry.getBoundingClientRect();
+        const margin = 32;
+        if (entryRect.top < railRect.top + margin || entryRect.bottom > railRect.bottom - margin) {
+          entry.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      };
+
       const setActive = (entry) => {
         if (entry === active) return;
         if (active) active.classList.remove('toc-active');
         active = entry;
-        if (active) active.classList.add('toc-active');
+        if (active) {
+          active.classList.add('toc-active');
+          scrollActiveIntoView(active);
+        }
       };
 
       const resolveActiveEntry = () => {

@@ -34,7 +34,7 @@ useKatex: false
 * Tail Call Elimination
     * Tail recursion: nếu lời gọi hàm nằm ở cuối (không cần làm gì thêm sau đó), ta có thể biến nó thành vòng lặp → không cần stack.
 
-    ```C
+    ```c
     int factorial(int n, int p = 1) {
         if (n == 0)
             return p;
