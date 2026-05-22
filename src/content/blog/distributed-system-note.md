@@ -68,6 +68,19 @@ useKatex: false
       - [Khi đếm dùng làm rate limit](#khi-đếm-dùng-làm-rate-limit)
       - [Chống overcounting và undercounting](#chống-overcounting-và-undercounting)
       - [Một số bài toán thực tế](#một-số-bài-toán-thực-tế)
+    - [Distributed Leaderboard](#distributed-leaderboard)
+      - [Bài toán](#bài-toán-2)
+      - [Hướng tiếp cận đầu tiên: SQL trực tiếp](#hướng-tiếp-cận-đầu-tiên-sql-trực-tiếp)
+      - [Bước 1: In-memory + sorted set (Redis ZSET)](#bước-1-in-memory--sorted-set-redis-zset)
+      - [Bước 2: Persist async xuống DB](#bước-2-persist-async-xuống-db)
+      - [Bước 3: Sharding theo roomID](#bước-3-sharding-theo-roomid)
+      - [Bước 4: Hot room → shard thêm theo region](#bước-4-hot-room--shard-thêm-theo-region)
+      - [Bước 5: Global ranking — shard theo userID](#bước-5-global-ranking--shard-theo-userid)
+      - [Query top 100 across shards: heap merge](#query-top-100-across-shards-heap-merge)
+      - [Query rank của một user across shards](#query-rank-của-một-user-across-shards)
+      - [Tie-breaking: khi điểm bằng nhau](#tie-breaking-khi-điểm-bằng-nhau)
+      - [Bài toán mở rộng: Friend Leaderboard](#bài-toán-mở-rộng-friend-leaderboard)
+      - [Tóm tắt chiến lược](#tóm-tắt-chiến-lược-1)
   - [Reference](#reference)
 
 ## Vấn đề nền tảng 
@@ -743,7 +756,7 @@ Có 3 hướng tiếp cận, đi từ nặng đến nhẹ:
 
 ```sql
 SELECT * FROM orders WHERE id = 123 FOR UPDATE;
-UPDATE orders SET status = 'processing' WHERE id = 123;
+UPDATE orders SET stock = stock - 1 WHERE id = 123;
 ```
 
 `FOR UPDATE` giữ row lock đến khi commit. An toàn tuyệt đối, nhưng request 2, 3, 4... phải xếp hàng → bottleneck cao, có nguy cơ deadlock nếu lock nhiều row theo thứ tự khác nhau.
@@ -752,7 +765,7 @@ UPDATE orders SET status = 'processing' WHERE id = 123;
 
 ```sql
 UPDATE orders
-SET status = 'processing', version = version + 1
+SET stock = stock - 1, version = version + 1
 WHERE id = 123 AND version = 1;
 ```
 
@@ -762,14 +775,8 @@ Không khóa, mỗi request đọc version, update có điều kiện `version` 
 
 ```sql
 UPDATE orders
-SET status = 'processing'
-WHERE id = 123 AND status = 'pending';
-```
-
-Hoặc cho stock:
-
-```sql
-UPDATE products SET stock = stock - 1 WHERE id = 1 AND stock > 0;
+SET stock = stock - 1
+WHERE id = 123 AND stock > 0;
 ```
 
 DB tự serialize update trên cùng row. Logic check + write nằm trong 1 statement, không cần version, không cần retry, không cần lock.
@@ -1383,6 +1390,368 @@ Khi đếm phân tán, sai sót đến từ nhiều nguồn. Mỗi loại có gi
 **"Đếm distinct events trong sliding window 1 phút."**: Sliding HyperLogLog: tạo 1 HLL per second bucket, merge 60 bucket cho window 1 phút. Memory: 60 × 12KB = 720KB cho 1 entity — vẫn nhẹ. Khi window trượt, drop bucket cũ nhất, thêm bucket mới.
 
 Nguyên tắc xuyên suốt: **đừng over-engineer**. DB atomic đủ cho 95% bài toán đếm hàng ngày. Chỉ thêm Redis/sharding/HLL khi đo benchmark cho thấy DB không kịp. Premature optimization sẽ chỉ thêm SPOF, thêm consistency issue, thêm operational cost mà không giải quyết vấn đề thực sự.
+
+### Distributed Leaderboard
+
+#### Bài toán
+
+Game online chia user thành nhiều phòng (room). Trong một phòng, user liên tục được cộng/trừ điểm — vài chục đến vài trăm lần update mỗi user trong một ván. Hai query xuất hiện ở mọi UI:
+
+- **Top 100** của phòng (hoặc toàn server) — hiển thị bảng xếp hạng.
+- **Rank + score hiện tại của chính user đang chơi** — hiển thị mỗi khi điểm thay đổi.
+
+Yêu cầu thực tế:
+
+- Update score: hàng chục nghìn op/s khi event lớn (vài triệu CCU, vài trăm nghìn phòng đồng thời).
+- Latency: cả update lẫn read rank đều phải dưới **vài chục ms** (UI realtime).
+- Không được mất điểm khi crash.
+- Cần persist log đầy đủ phục vụ điều tra gian lận, analytics, reset season.
+
+**Workload tham chiếu để đối chiếu xuyên suốt.** Mọi quyết định scale dưới đây đều quay về một bộ số cụ thể:
+
+| Tham số | Giá trị | Ghi chú |
+|---|---|---|
+| CCU peak | 1M user | Event lớn, mid-tier mobile game |
+| Số phòng đồng thời | 50.000 (≈20 user/phòng) | Tải phân bố đều |
+| Hot room (event boss/PvP) | 100k–1M user / 1 phòng | Tải tập trung lệch |
+| Tần suất update score | 1 op / 5s / user | Trong ván |
+| Tần suất read rank | 1 op ngay sau mỗi update | UI realtime |
+| Latency budget | p99 < 50ms end-to-end | Tính cả mạng |
+
+- **Write toàn cluster**: `1M user / 5s = 200k op/s`.
+- **Read rank toàn cluster**: `~200k op/s` (mỗi write kèm 1 read).
+- **Tổng**: **~400k op/s** trên score path.
+
+Hai con số này so với từng giới hạn (DB, Redis, single key, fan-out...) sẽ ra ngưỡng triển khai mỗi bước.
+
+#### Hướng tiếp cận đầu tiên: SQL trực tiếp
+
+Cách "tự nhiên" nhất: bảng `scores(user_id, room_id, score)`, query rank bằng window function:
+
+```sql
+SELECT user_id, score,
+       RANK() OVER (PARTITION BY room_id ORDER BY score DESC) AS rank
+FROM scores
+WHERE room_id = ?;
+```
+
+Hoặc đếm số user có score cao hơn:
+
+```sql
+SELECT 1 + COUNT(*) AS rank
+FROM scores
+WHERE room_id = ? AND score > (SELECT score FROM scores WHERE user_id = ?);
+```
+
+Vấn đề:
+
+- Mỗi query rank quét toàn bộ user trong room — **O(N)** trên một phòng đông. Index trên `(room_id, score DESC)` đỡ một phần, nhưng `COUNT(*)` vẫn phải đi qua toàn bộ entry có `score > X` (range scan).
+- Update score đụng cùng row liên tục → **row lock contention** y hệt bài toán đếm. 10k-20k TPS cùng một phòng là DB đã ngộp.
+- Mỗi lần user được cộng điểm, UI gọi 1 query rank → read amplification cực lớn so với write.
+
+**SQL Có ba giới hạn cần đối chiếu**:
+
+1. **Cost một rank query.** Index B-tree trên `(room_id, score)`: với 100k user/phòng, mỗi entry ~50 byte, page 8KB chứa ~160 entry → cây cao 3 level. `COUNT(* WHERE score > X)` phải walk range trung bình `N/2 ≈ 50k` entry = ~310 page = 2.5MB từ cache. → **2–5ms nếu hot, 50–200ms nếu cold**. Phòng cỡ 1M user: **20–50ms cold mỗi query** — vượt budget 50ms ngay từ DB.
+
+2. **Throughput toàn DB.** Postgres single-node ~**20k–50k simple TPS** sustained. Workload tham chiếu **400k op/s** → vượt **10–20×**. Vertical scale (64-core, NVMe) chỉ thêm 2–3× → không đủ.
+
+3. **Connection pool.** Query rank 5ms → 1 connection xử lý 200 op/s → cần **~2000 connection** cho 400k op/s. Postgres khuyến nghị tối đa vài trăm → cần PgBouncer + nhiều replica → đã chạm độ phức tạp tương đương Redis nhưng kém tốc độ.
+
+**Trigger chuyển sang in-memory:** CCU > **~50k** (workload > 20k op/s), hoặc rank query p99 > 50ms, hoặc DB CPU sustained > 70%. Dưới ngưỡng đó SQL vẫn ổn — không over-engineer sớm.
+
+==> DB truyền thống không sinh ra cho ranking realtime high-throughput low-latency. Cần data structure chuyên cho **ordered set**.
+
+#### Bước 1: In-memory + sorted set (Redis ZSET)
+
+Redis `ZSET` là **skip list + hash table**: insert, update, query rank, query top-K đều **O(log N)**. Đây chính là cấu trúc sinh ra cho leaderboard.
+
+```redis
+ZADD lb:room:42 1500 user:101      # set score (idempotent theo user)
+ZINCRBY lb:room:42 +30 user:101    # cộng điểm atomic
+ZREVRANGE lb:room:42 0 99 WITHSCORES   # top 100, O(log N + 100)
+ZREVRANK lb:room:42 user:101       # rank của user, O(log N)
+ZSCORE lb:room:42 user:101         # score hiện tại, O(1)
+```
+
+**Một Redis chứa được tới đâu?**:
+
+| Giới hạn | Con số | Nguồn |
+|---|---|---|
+| Throughput cluster-wide / instance | ~150k op/s sustained, ~200k peak | Redis 7.x, 1 core data path |
+| Throughput **1 key** (hot key) | ~100k op/s | Single-threaded per key |
+| Memory mỗi ZSET entry | ~64 byte (skip-list + dict) | OBJECT ENCODING skiplist |
+| Latency intra-AZ | p50 ~50μs, p99 ~500μs | <0.5ms RTT |
+
+**workload tham chiếu:**
+- 400k op/s tổng / 150k op/s instance = **2.7 → cần ~3-4 instance**. Một node không đủ → cần đến bước 3.
+- 1M user × 64B = **64MB** ZSET cho toàn server. Memory không phải bottleneck (node 8GB dư sức).
+- Latency per op ~50μs vs budget 50ms → headroom 1000×. Latency không phải bottleneck.
+
+**Trigger ở lại 1 node:** workload < **150k op/s** (≈ < 750k CCU theo công thức `CCU = op/s × 5s`). MVP thường nằm trong vùng này.
+
+Trade-off: Redis in-memory, crash mất dữ liệu nếu chưa persist. Xử lý ở bước sau.
+
+#### Bước 2: Persist async xuống DB
+
+ZSET giải quyết tốc độ. Còn lại là durability và analytics. Tách hai luồng:
+
+```
+[Client] → API → Redis ZINCRBY (atomic, ~1ms)
+                    ↓
+                 publish score-event vào Kafka
+                    ↓
+       ┌────────────┴────────────┐
+       ↓                         ↓
+  [Consumer A]              [Consumer B]
+  append vào DB             aggregate cho analytics
+  (score_history)           (ClickHouse, BI...)
+```
+
+- **Critical path** (update + read rank) chỉ chạm Redis — quyết định latency UX.
+- **Side path** (log lịch sử điểm, analytics) đi qua queue — không ảnh hưởng critical path. Nếu Kafka consumer chậm, queue dồn lại, không invalidate score Redis. ((Pattern này gọi là **Command-Query Responsibility Segregation** — tách write path nhanh khỏi read path phục vụ analytics/persistence.))
+- **Batching** ở consumer DB: gom 1000 event trong 200ms thành một INSERT — DB chịu được vài chục nghìn event/s thay vì vài nghìn.
+- Khi cần "source of truth" tuyệt đối (kết thúc season, trao giải), Redis chỉ là cache: replay từ Kafka log → tính lại score → đối chiếu Redis. Lệch thì lấy log làm chuẩn.
+
+**Sizing pipeline theo workload tham chiếu** — đi từ event size ngược ra cluster:
+
+| Tầng | Tính toán | Yêu cầu |
+|---|---|---|
+| Event payload | `{user_id, room_id, delta, ts, txn_id}` ≈ 80 byte Protobuf | — |
+| Ingestion bandwidth | 400k op/s × 80B = **32 MB/s** | 3 Kafka broker RF=3 dư sức (mỗi broker ăn 100 MB/s) |
+| Kafka partition | 1 partition ~10k msg/s msg nhỏ | **≥40 partition** (partition key = `room_id` để giữ ordering trong phòng) |
+| DB write throughput | INSERT batch 1000 row ≈ 30k row/s/connection | **~14 consumer worker** (400k / 30k) |
+| Consumer lag (batch 1000 / 200ms) | 200ms | Đủ cho analytics; forensic realtime giảm batch 100/20ms |
+
+Trade-off Redis crash giữa update và Kafka publish: mất vài event gần nhất. Khắc phục: AOF `appendfsync everysec` + replica (mất ≤1s), hoặc publish-Kafka-trước-apply-Redis-sau (đánh đổi thêm ~2-5ms latency).
+
+#### Bước 3: Sharding theo roomID
+
+Một Redis instance giới hạn ~100k op/s. Khi event lớn có **hàng trăm nghìn phòng đồng thời**, một node không đủ. Cần shard.
+
+Lựa chọn tự nhiên: **shard theo `room_id`** vì mọi query (top 100 của phòng, rank của user trong phòng) đều có scope là phòng. Mỗi shard giữ một tập phòng nguyên vẹn → không cần fan-out:
+
+```
+shard_id = hash(room_id) % N
+key = "lb:room:{room_id}"   (curly brace = hash tag, ép vào cùng slot)
+```
+
+Khi user request rank, biết `room_id` → route thẳng vào shard chứa phòng đó → ZSET cục bộ trả lời nguyên vẹn O(log N). Đây gọi là **co-located sharding** — mọi data của một logical entity nằm chung shard.
+
+**Số shard tối thiểu**:
+
+- Trần 1 instance = **150k op/s** (giữ 50% headroom cho burst, tối đa ~200k).
+- Số shard: `N = ⌈workload_peak / 150k⌉`. Với workload tham chiếu 400k op/s → **N = 3, làm tròn lên 4**.
+- Memory check: 50k phòng / 4 shard = 12.5k phòng/shard, ~20 user/phòng → 250k entry × 64B = **16MB/shard**. Không gần giới hạn node.
+- Skewness check: nếu một phòng "boss" có 1M user, shard chứa nó nuốt riêng `200k op/s` cho ZSET đó → vượt **trần 1 key (100k op/s)**. Tín hiệu cần bước 4. (Bước 3 phân tải giữa các phòng, nhưng không cứu được phòng hot.)
+
+**Trigger triển khai:**
+- Peak workload > **150k op/s** (≈ CCU > 750k), hoặc
+- Redis CPU sustained > 70% (đo bằng `redis-cli --latency` + `INFO commandstats`), hoặc
+- Memory node > 50% RAM (chừa chỗ cho AOF rewrite + replica buffer).
+
+Lợi: scale ngang gần tuyến tính. Mỗi shard mới = +150k op/s.
+
+#### Bước 4: Hot room → shard thêm theo region
+
+Sharding theo room đẹp khi tải phân bố đều. Nhưng event lớn thường có một phòng "boss room" hoặc PvP arena với cả triệu CCU cùng nhồi điểm vào một ZSET — **hot shard**. Một Redis node lại ngộp.
+
+Giải pháp: trong một phòng quá nóng, **sub-shard theo region của user**:
+
+```
+lb:room:42:region:asia    (ZSET local cho user châu Á trong phòng 42)
+lb:room:42:region:eu
+lb:room:42:region:us
+```
+
+User update score chỉ ghi vào ZSET region của mình → tải chia đều theo region. Region thường có ý nghĩa thực tế (matchmaking gần region, latency thấp) nên việc tách này là tự nhiên .
+
+**Bước 3 chia tải theo phòng, nhưng không chia được tải trong một phòng.** Đây là giới hạn mới cần đối chiếu:
+
+- Trần **1 ZSET key**: ~**100k op/s** (Redis single-threaded data path, một key bám một core).
+- Hot room 1M user × 1 op/5s = **200k op/s vào một key** → vượt trần **2×**. Hệ quả: queue tích nội bộ Redis, latency p99 nhảy lên hàng chục ms, các key khác cùng instance cũng chậm theo (head-of-line blocking).
+- Số sub-shard: `K = ⌈hot_key_rate / 100k × 1.5⌉ = ⌈200k / 100k × 1.5⌉ = 3`. Thực tế chọn **4** theo region tự nhiên (asia/eu/us/latam) để biên giới có nghĩa và matchmaking đã shard theo region.
+- Sau khi sub-shard: 250k user × 64B = 16MB/sub-shard, 50k op/s/sub-shard — dưới trần xa.
+
+**Trigger triển khai:** không chờ CCU, mà theo dõi **per-key throughput**.
+- Phát hiện hot key: `redis-cli --hotkeys` hoặc Redis `MONITOR` sampling.
+- Ngưỡng: một ZSET single-key sustained > **70k op/s** → sub-shard ngay (chừa biên 30% trước khi đụng trần 100k).
+
+Trade-off: query "top 100 của phòng" phải fan-out tất cả region rồi merge. Xử lý ở phần [Query top 100 across shards](#query-top-100-across-shards-heap-merge).
+
+#### Bước 5: Global ranking — shard theo userID
+
+Khi cần ranking **toàn server** (không scope theo room — kiểu "top 100 player toàn cầu"), không có khái niệm "room" để shard. Một ZSET global chứa tất cả user là SPOF mới.
+
+Hoặc tệ hơn: trong một region đã sub-shard rồi, vẫn có thể có hot key nếu region đó tập trung đông user. Cần shard tầng cuối: **shard theo `user_id`**.
+
+```
+shard_id = hash(user_id) % M
+lb:global:shard:0   (ZSET chứa các user thuộc shard 0)
+lb:global:shard:1
+...
+lb:global:shard:M
+```
+
+User update score → biết `user_id` → chọn shard duy nhất → ZINCRBY. Tải write chia đều theo `M` shard.
+
+- ZSET global gom toàn server: với MAU 100M, kích thước = 100M × 64B = **6.4GB**. Memory OK trên 1 node 16GB, nhưng…
+- Write rate global = workload write toàn cluster = **200k op/s vào một key** → vượt trần single-key 100k op/s → **vỡ y hệt hot room**.
+- Số shard `M = ⌈write_peak / 100k × 1.5⌉`. Peak event ~500k op/s → **M = 8 tối thiểu**. Thực tế chọn **16-32** để (a) headroom cho event tương lai, (b) mỗi ZSET shard < ~500MB cho ổn định AOF/snapshot.
+
+**Trigger triển khai:** phải thỏa cả hai:
+1. Có requirement ranking phạm vi vượt scope room (global, season-wide, cross-room).
+2. Write rate trên ZSET global vượt **~70k op/s** sustained.
+
+Nếu chỉ (1) mà write rate thấp: dùng 1 ZSET global, không cần shard. Nếu chỉ (2) mà không có (1): không cần ZSET global, ZSET per-room đã đủ.
+
+**Nhưng**: hai query gốc nay đều bị "vỡ":
+- Top 100 toàn server: không một shard nào tự có câu trả lời.
+- Rank của user: ZREVRANK trên shard cục bộ chỉ ra rank **trong shard đó**, không phải global.
+
+Đây là cái giá của sharding khi access pattern không co-located với shard key. Hai phần dưới giải quyết hai query này.
+
+#### Query top 100 across shards: heap merge
+
+Khi top-K được trải trên M shard, dùng **k-way merge với min-heap**:
+
+```
+1. Mỗi shard trả về top 100 cục bộ của nó (mỗi shard O(log N + 100))
+2. Đẩy 100 phần tử của mỗi shard vào max-heap (hoặc min-heap kích thước 100)
+3. Pop ra 100 phần tử có score cao nhất → đây là top 100 global
+```
+
+Tại sao heap thắng full-sort? Sort `M × 100` phần tử là `O(M·100·log(M·100))`. Heap kích thước 100 với streaming pull chỉ là `O(M·100·log 100)` — `log 100 ≈ 7`, hằng số nhỏ và bộ nhớ chỉ 100 slot.
+
+**Cost một query top 100** (M=32 shard):
+
+```
+latency_query ≈ max(per_shard_ZREVRANGE) + merge_cost
+              = ~200μs                    + ~50μs (3200 entry × log₂100 ≈ 21k op)
+              ≈ 1ms
+```
+
+Cost rẻ. Vấn đề thực sự là **read amplification** từ UI:
+
+| Trường hợp | Số request vào Redis cluster | Ghi chú |
+|---|---|---|
+| Không cache, 100k client × 1 poll/s | 100k × 32 = **3.2M op/s** | Vượt cluster (~4.8M op/s ceiling) |
+| Cache TTL 1s, 100k client | 1 × 32 = **32 op/s** | Giảm **100.000×** |
+| Cache TTL 5s | **6.4 op/s** | Stale 5s — vẫn ổn cho leaderboard |
+
+**Decision rule:**
+- UI poll mật độ cao (>1k client cùng poll top) → **bắt buộc cache TTL ≥1s**.
+- ZSET mỗi shard > 1M entry và ZREVRANGE bắt đầu chậm → thêm **tiered top** (mỗi shard maintain ZSET phụ "top 100 local", update lazy). Tránh scan ZSET lớn lúc read.
+- Latency budget cực gắt → fan-out song song với connection multiplexed (1 connection / shard); RTT mạng dominate, không phải Redis op.
+
+#### Query rank của một user across shards
+
+ZREVRANK trên shard của user chỉ trả về rank cục bộ. Cần biến nó thành rank global.
+
+**Ý tưởng**: rank global của user U với điểm `S` = `1 + tổng số user có điểm > S trên toàn hệ thống`. Không cần biết ai cao hơn — chỉ cần đếm.
+
+```
+rank_global(U) = 1 + Σ over all shards: ZCOUNT(shard_i, (S, +inf))
+```
+
+Mỗi shard có thể trả lời ZCOUNT theo range điểm trong **O(log N)** vì ZSET là skip list — đi từ score `S` đến cuối ZSET là một range query rẻ. Tổng cost: `O(M·log N)` — quá rẻ.
+
+```redis
+score = ZSCORE lb:global:shard:k user:U      # shard chứa U
+                                              # k = hash(U) % M
+# fan-out song song:
+for i in 0..M-1:
+    cnt[i] = ZCOUNT lb:global:shard:i (score +inf)
+rank = 1 + sum(cnt)
+```
+
+**Hai chiều cost cần check: latency mỗi query, và throughput tổng vào cluster.**
+
+Chiều latency phụ thuộc **M** (số shard) qua hiệu ứng "tail at scale" — fan-out càng nhiều, p99 toàn query càng gần `max` của M tail riêng lẻ:
+
+| M | per-shard p99 | max-of-M p99 (xấp xỉ) | Khả thi? |
+|---|---|---|---|
+| 32 | ~500μs | ~1-2ms | Quá rẻ |
+| 200 | ~1ms | ~5-8ms | Bắt đầu thấy giới hạn |
+| 1000 | ~1ms | ~20-50ms | Chạm budget → cần histogram |
+
+Chiều throughput: workload tham chiếu 200k read rank/s × M shard = read amplification:
+
+| M | ZCOUNT op/s vào cluster | Cluster capacity | Ổn? |
+|---|---|---|---|
+| 32 | 200k × 32 = **6.4M** | 32 × 150k = 4.8M | Vượt → cần cache |
+| 200 | 200k × 200 = **40M** | 200 × 150k = 30M | Vượt → bắt buộc cache + giảm fan-out |
+
+→ **Cache rank per-user TTL 1-2s**: user trung bình không refresh rank dưới 2s, cache hit ratio ~95%+ → giảm Redis op ~20-30 lần.
+
+**Decision rule:**
+- M ≤ 64 và đã có cache user-rank TTL 2s → ZCOUNT fan-out **vẫn là lựa chọn chuẩn** (chính xác tuyệt đối, latency rẻ).
+- M > 200 hoặc max-of-M p99 > 20ms → chuyển **histogram / sketch**, đánh đổi accuracy lấy fan-out cost.
+
+Đây là cách XBOX Live và một số mobile game leaderboard dùng. Biến thể khi M lớn:
+
+- **Approximate rank bằng histogram**: mỗi shard pre-aggregate phân bố điểm vào bucket (ví dụ 1000 bucket). Coordinator chỉ cần đọc histogram (KB-size), tính rank xấp xỉ bằng cách cộng bucket > S. Sai số = kích thước bucket. Histogram refresh mỗi vài giây. ((Số liệu: 1000 bucket × 8 byte = **8KB/shard**. M=200 shard → 1.6MB toàn cluster — cache nguyên trong RAM coordinator. Refresh mỗi 2s = 100 op/s/shard background — không đáng kể. Sai số nếu score range [0, 100k] và 1000 bucket: ±100 score → sai rank ~`100 × density`. Với 100M user, density tại score median ~`100M / 100k = 1000 user/score` → sai số rank ±100k tức **~0.1%** trên dải 100M — tốt hơn yêu cầu hiển thị "top 5%".))
+
+- **Tiered exactness**: top 1000 (gần đỉnh) hiển thị rank chính xác (dùng ZCOUNT). Ngoài top 1000, hiển thị "Top 5%" thay vì số rank cụ thể — vừa đỡ tải vừa thực tế (user rank 50.000 hay 50.005 không khác gì với họ).
+
+- **Cache theo (score-bucket, timestamp)**: hai user có score gần nhau request rank cách nhau 100ms → rank chênh không đáng kể → trả từ cache của bucket [S-Δ, S+Δ].
+
+#### Tie-breaking: khi điểm bằng nhau
+
+Hai user cùng score thì ai trên ai? ZSET sort theo score, ties sort theo member lex order — không kiểm soát được. Cần encode tiebreaker vào score:
+
+```
+score_composite = score * 10^10 + (MAX_TS - timestamp_đạt_score)
+```
+
+User đạt điểm `S` sớm hơn sẽ có `score_composite` lớn hơn → xếp trên user đạt sau. Decode khi hiển thị: `display_score = score_composite // 10^10`.
+
+**Kiểm tra ngân sách bit của float64** cho composite score:
+
+```
+float64 mantissa = 53 bit → integer chính xác đến 2^53 ≈ 9 × 10^15
+
+composite = score × 10^10 + (MAX_TS - ts_ms)
+            └────┬─────┘    └─────┬──────┘
+               score part        ts part
+```
+
+- `ts_ms` (Unix epoch ms) ~`1.7 × 10^12` < `2^41` → ts part chiếm 41 bit.
+- Còn lại cho score part: `2^53 - 2^41 ≈ 9 × 10^15`.
+- Nên `score × 10^10 < 9 × 10^15` → **score max ≈ 900.000**.
+
+#### Bài toán mở rộng: Friend Leaderboard
+
+Một bài toán phổ biến phá vỡ sharding strategy ở trên: **"Top 10 trong danh sách bạn bè của tôi"**.
+
+Mỗi user có vài chục đến vài nghìn friend. Friend list mỗi user khác nhau hoàn toàn — không có scope chung như "room" hay "global". Không thể pre-compute leaderboard cho mọi friend-set có thể có (số lượng tổ hợp bùng nổ).
+
+Các cách tiếp cận:
+
+1. **Per-user friend ZSET cached**: pre-compute và cache `lb:friends:U` cho user active. Cập nhật khi friend của U được cộng điểm. **Cost = write amplification:**
+
+   ```
+   redis_op/s = workload_write × avg_friend_count
+              = 200k × 150     = 30M op/s
+   ```
+
+   Gấp **~75× baseline** → buộc shard rộng (~300 shard) hoặc dùng aggregator queue + flush batch (gom nhiều delta của cùng 1 user trước khi fan-out, giảm 5–10×). Phù hợp khi read:write ratio cao và friend list ổn định.
+
+2. **Reverse index**: với mỗi user, lưu `inverse_friend:U = {users coi U là friend}`. Khi U được cộng điểm, fan-out update các ZSET `lb:friends:V` cho mỗi V trong reverse list. Lựa chọn đánh đổi giữa write cost và read cost — Facebook timeline cũng dùng dạng fan-out write như vậy. ((Facebook gọi pattern này là **"write fan-out vs read fan-out"** — celebrity với 10M follower thì read fan-out (lazy compute khi xem), user thường thì write fan-out (push khi post)))
+
+
+**Bảng ngưỡng triển khai (số đo trực tiếp → hành động):**
+
+| Bước | Metric đo được | Ngưỡng | Hành động |
+|---|---|---|---|
+| 0 → 1 | Workload op/s (CCU/5s × 2) | > **20k op/s** hoặc rank query p99 > 50ms | Chuyển SQL → Redis ZSET |
+| 1 → 2 | Có requirement audit/season? | requirement = yes | Thêm Kafka + DB consumer (batch 1000/200ms) |
+| 1 → 3 | Redis CPU sustained, hoặc op/s/instance | > **70%** CPU, hoặc > **150k op/s** | Shard `room_id`, N = ⌈peak/150k⌉ |
+| 3 → 4 | Per-key op/s (`redis-cli --hotkeys`) | > **70k op/s** trên 1 ZSET | Sub-shard hot room theo region |
+| 3 → 5 | Có cần ranking cross-room **và** global write > 70k/key | Cả 2 | Shard `user_id`, M = ⌈peak/100k × 1.5⌉ |
+| 5 → topK | UI poll top 100, số client cùng poll | > **1k client/s** | Cache top 100 TTL 1-5s |
+| 5 → rank | M, max-of-M p99 | M > 200, hoặc p99 > 20ms | Histogram (1000 bucket, 8KB/shard) hoặc t-digest |
+
+99% game không bao giờ cần đến tầng shard userID. Đo benchmark trước, scale sau. Một Redis cluster với sharding theo room_id phục vụ được hàng triệu CCU trong đa số game thực tế.
 
 ## Reference 
 

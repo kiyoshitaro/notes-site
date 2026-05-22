@@ -14,37 +14,79 @@
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
+  font-family: var(--font-sans);
   font-weight: 700;
-  margin-top: 1.2em;
-  margin-bottom: 0.6em;
   color: var(--fg-strong);
-  line-height: 1.25;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 1.5rem;
 }
 
 .markdown-body h1 {
-  font-size: 1.8rem;
-  margin-top: 1.8em;
+  font-size: 2.1rem;
+  margin-top: 2.4em;
+  margin-bottom: 0.7em;
+  padding-bottom: 0.35em;
+  border-bottom: 3px double var(--border-strong);
 }
 
 .markdown-body h2 {
-  font-size: 1.45rem;
+  font-size: 1.7rem;
+  margin-top: 2.2em;
+  margin-bottom: 0.6em;
+  padding: 0.15em 0 0.3em 0.7em;
+  border-left: 4px solid var(--accent);
+  border-bottom: 1.5px solid var(--border-strong);
+  color: var(--accent);
 }
 
 .markdown-body h3 {
-  font-size: 1.2rem;
+  font-size: 1.35rem;
+  margin-top: 1.9em;
+  margin-bottom: 0.5em;
+  padding-left: 0.6em;
+  border-left: 3px solid var(--border-strong);
+}
+
+.markdown-body h3::before {
+  content: "§ ";
+  color: var(--accent);
+  font-weight: 600;
+  margin-right: 0.1em;
 }
 
 .markdown-body h4 {
-  font-size: 1.08rem;
+  font-size: 1.12rem;
+  margin-top: 1.6em;
+  margin-bottom: 0.4em;
+  font-style: italic;
+  color: var(--fg);
+}
+
+.markdown-body h4::before {
+  content: "▸ ";
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 700;
 }
 
 .markdown-body h5 {
-  font-size: 0.95rem;
+  font-size: 0.98rem;
+  margin-top: 1.4em;
+  margin-bottom: 0.3em;
+  color: var(--fg-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .markdown-body h6 {
-  font-size: 0.9rem;
-  letter-spacing: 0.01em;
+  font-size: 0.88rem;
+  margin-top: 1.2em;
+  margin-bottom: 0.3em;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
 }
 
 .markdown-body p {
@@ -291,20 +333,22 @@
   }
 
   .markdown-body h1 {
-    font-size: 1.4rem;
-    margin-top: 1.4em;
+    font-size: 1.55rem;
+    margin-top: 1.6em;
   }
 
   .markdown-body h2 {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
+    padding-left: 0.55em;
   }
 
   .markdown-body h3 {
-    font-size: 1.05rem;
+    font-size: 1.12rem;
+    padding-left: 0.5em;
   }
 
   .markdown-body h4 {
-    font-size: 0.98rem;
+    font-size: 1rem;
   }
 
   .markdown-body h5 {
@@ -312,7 +356,7 @@
   }
 
   .markdown-body h6 {
-    font-size: 0.86rem;
+    font-size: 0.84rem;
   }
 
   .markdown-body ul,
