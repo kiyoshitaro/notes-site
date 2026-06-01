@@ -8,18 +8,15 @@ description: "Ghi chú về IPN service"
 cat: "misc"
 useKatex: false
 ---
-# Distributed Task Scheduler — Webhook Delivery (IPN service)
+<!-- # Distributed Task Scheduler — Webhook Delivery (IPN service) -->
 IPN service ở đây là dịch vụ "Instant Payment Notification" / webhook delivery của hệ thống payment gateway.
 
 ## Bối cảnh nghiệp vụ
 
-- Nhận các sự kiện cần báo cho merchant (payment succeeded, refund, chargeback...) từ hệ thống nội bộ.
-- Chuyển các sự kiện đó thành các “webhook job” và lưu vào DB.
+- Khi thanh toán / hoàn tiền thay đổi trạng thái, hệ thống nội bộ **core-payment** publish sự kiện (payment succeeded, refund, chargeback...) lên Kafka. **pg-ipn-service** phải **POST webhook** tới URL merchant đã cấu hình — tương tự IPN/notification B2B. Merchant cần nhận thông báo **đáng tin cậy**.
 - Định tuyến, ký và gửi HTTP callback tới URL của merchant.
 - Quản lý retry, trạng thái thành công/thất bại, replay khi cần.
 - Cung cấp API quản trị / merchant để xem trạng thái, replay, kiểm tra lịch sử webhook.
-
-Khi thanh toán / hoàn tiền thay đổi trạng thái, **core-payment** publish sự kiện lên Kafka. **pg-ipn-service** phải **POST webhook** tới URL merchant đã cấu hình — tương tự IPN/notification B2B. Merchant cần nhận thông báo **đáng tin cậy**.
 
 ## Lí do tách service
 
@@ -29,17 +26,15 @@ Khi thanh toán / hoàn tiền thay đổi trạng thái, **core-payment** publi
 - Dễ triển khai, vận hành: deploy riêng, bảo trì không ảnh hưởng trực tiếp tới payment transaction.
 - Bảo mật: webhook ra ngoài internet cần layer riêng, signature, auth, hạn chế surface attack.
 
-==> Kafka là một hệ thống messaging rất tốt cho truyền event nội bộ, nhưng gửi webhook ra ngoài (HTTP tới merchant) có những yêu cầu khác (durability per-delivery, status/metrics/audit, retry policy, rate-limit, admin replay, transactional outbox) 
+==> Kafka là một hệ thống messaging rất tốt cho truyền event nội bộ, nhưng gửi webhook ra ngoài (HTTP tới merchant) có những yêu cầu khác (durability per-delivery, status/metrics/audit, retry policy, rate-limit, admin replay, transactional outbox) nên phải có layer xử lí trên 
 
 Tóm lại, IPN service ở đây là thành phần trung gian quan trọng để đảm bảo các sự kiện payment được chuyển tới merchant một cách đáng tin cậy, có retry và quản lý lịch sử. Vì vậy nó thường được tách ra làm service riêng để dễ scale, vận hành và cô lập với các luồng payment khác.
 
 ## Vấn đề kỹ thuật
 
-Cùng `eventId` có thể xử lý nhiều lần (kafka event) + Nhiều process/instance cùng đọc/ghi `webhook_jobs` + HTTP merchant **không nằm trong transaction DB** 
-
 Đó là bài toán **distributed task scheduling** + **durable work queue** + **state machine** cho side-effect (HTTP).
 
-## NFR
+### NFR
 
 | NFR | Ý nghĩa trong webhook delivery |
 |-----|--------------------------------|
@@ -59,27 +54,81 @@ Giải pháp tự nhiên là POST ngay trong Kafka consumer
 ```
 Kafka → parse → POST merchant → commit offset 
 ```
-✅ Đơn giản -> Consumer block theo HTTP; redeliver = gửi trùng / mất kiểm soát; không retry có cấu trúc => để đảm bảo durable ta cần **Ghi DB**
+Đơn giản -> nhưng consumer bị block theo HTTP; redeliver = gửi trùng / mất kiểm soát; không retry có cấu trúc => để đảm bảo durable ta cần **Ghi DB**
 ```
 Kafka → INSERT webhook_jobs (PENDING)
 Cron  → SELECT pending → POST → UPDATE
 ```
-✅ Durability, decouple ingest/delivery -> Single point; chưa scale pod lúc này cần làm HA cho cron (pod B thay A) tuy nhiên **2 pod POST cùng job** — mất correctness => cần mutex (*ai được poll batch này?*) => triên khai **ShedLock (mutex scheduler)**
+Quá trình nhận job từ Kafka có thể bị duplicate dẫn đến redeliver cần cơ chế dedup 2 tầng:
+```
+Kafka message (có thể gửi lại cùng eventId)
+        │
+        ▼
+EnvelopeProcessor.process()
+   ├─ mapper → CanonicalEvent (có eventId)
+        │
+        ▼
+CreateWebhookJobUseCase.apply()
+   ├─ Tier 1: Redis tryClaim
+   ├─ lấy webhook URL merchant
+   └─ Tier 2: INSERT webhook_jobs + UNIQUE(event_id)
+```
+- Tier 1 — Redis (nhanh, DB protect)
+```
+public boolean tryClaim(String key, Duration ttl) {
+       Boolean ok = redis.opsForValue().setIfAbsent(key, "1", ttl);
+       return Boolean.TRUE.equals(ok);
+}
+```
+- Tier 2 — DB UNIQUE(event_id) (durable): khi Redis down / miss hoặc hết TTL 24h hoặc concurrent 
+
+Đến đây đã durability, decouple ingest/delivery -> Tiếp theo cần thiết kế State Machine rõ ràng dể handle failure: `PENDING → IN_FLIGHT → DELIVERED | RETRYING | DLQ`
+
+```text
+                    CreateWebhookJobUseCase
+                              │
+                              ▼
+                          ┌─────────┐
+              ┌──────────│ PENDING │◄─── replay / sign_unavailable (pending path)
+              │          └────┬────┘
+              │               │ PendingDispatchScheduler.markInFlight
+              │               ▼
+              │          ┌───────────┐
+              │          │ IN_FLIGHT │
+              │          └─────┬─────┘
+              │    ┌───────────┼───────────┐
+              │    ▼           ▼           ▼
+              │ DELIVERED   RETRYING      DLQ
+              │               │
+              │               │ RetryDispatchScheduler
+              │               └──────► IN_FLIGHT ...
+              │
+              └── StuckJobSweeper: IN_FLIGHT (quá hạn) → RETRYING
+```
+
+Trường hợp pod crash, OOM, hoặc HTTP request treo quá lâu khi đang giữ IN_FLIGHT => job sẽ kẹt mãi ở trạng thái IN_FLIGHT ==> **Sweeper định kỳ quét các job IN_FLIGHT đã vượt quá stuck-threshold (ví dụ: 3 phút), sau đó chuyển chúng về RETRYING mà không tăng attempt_count.** (đảm bảo Recoverability cao)
+
+Hàm dispatch job thực chất là POST HTTP request đến webhook của merchant, phải phụ thuộc vào chất lượng webhook để nhận rep có thể có latency cao => nếu để toàn bộ quá trình (claim job → gửi HTTP → cập nhật outcome) nằm trong một transaction lớn, transaction sẽ bị giữ lock rất lâu, gây nghẽn database => tách riêng các thao tác transaction (markInFlight, updateOutcome, recordAttempt) để **fault isolation** => cần compensate thủ công nếu job bị stuck do downstream unavailable.
+
+Dispatcher chậm trong lúc đang chờ HTTP response, sweeper/retry có thể đã đổi state sang RETRYING hoặc thậm chí DELIVERED => khi dispatcher quay lại gọi updateOutcome, cần 1 guard để kiểm tra: nếu job không còn ở IN_FLIGHT, thì return null và không ghi đè
+
+Đến đây, hệ thống đã reliable nhưng vẫn tồn tại single point; lúc này cần làm HA cho cron (pod B thay A) tuy nhiên **2 pod POST cùng job** —> mất correctness => cần mutex (*ai được poll batch này?*) => triển khai **ShedLock (mutex scheduler)**
 ```
 Chỉ một pod giữ lock `pg-ipn-pending-dispatch` khi chạy `poll()`.
 ```
-==> ✅ Giảm double poll Pending nhưng không khóa từng job riêng lẻ; `lockAtMostFor` có thể hết giữa batch dài; Pending / Retry / Sweeper là **lock khác nhau** => chưa đủ mutex **job** ==> **Optimistic lock** (`@Version` + `OptimisticLockConflict`)
+ShedLock đã giúp giảm double poll Pending nhưng
+- không khóa từng job riêng lẻ; 
+- `lockAtMostFor=2m` có thể hết giữa batch dài 50 job × HTTP 10s  
+- `PendingDispatchScheduler` và `RetryDispatchScheduler` **lock khác nhau** — chạy song song và có thể gây race từng job  
+- `StuckJobSweeper` đổi state trong khi HTTP còn treo → `updateOutcome` return `null`  
+- Admin `replay` đổi state giữa `findPendingDue` và `markInFlight`
 ```
-`markInFlight`: chỉ transition nếu state vẫn `PENDING`/`RETRYING` và version khớp 
+==> mutex cho từng **job** bằng **Optimistic lock** (`@Version` + `OptimisticLockConflict`)
+`markInFlight`: chỉ transition nếu state vẫn `PENDING`/`RETRYING` và version khớp
 ```
 Giải pháp này đã giúp ✅ Correctness **theo row** khi nhiều pod cùng truy cập webhook_jobs, Conflict → skip, không crash batch. 
-Tiếp theo cân thiết kế State Machine rõ ràng: `PENDING → IN_FLIGHT → DELIVERED | RETRYING | DLQ`
 
-Tuy nhiên vẫn con trường hợp pod crash, OOM, hoặc HTTP request treo quá lâu khi đang giữ IN_FLIGHT => job sẽ kẹt mãi ở trạng thái IN_FLIGHT ==> **Sweeper định kỳ quét các job IN_FLIGHT đã vượt quá stuck-threshold (ví dụ: 3 phút), sau đó chuyển chúng về RETRYING mà không tăng attempt_count.** (đảm bảo Recoverability cao)
-
-Hàm dispatch job thực chất là POST HTTP request đến webhook của merchant, có thể có latency cao => nếu để toàn bộ quá trình (claim job → gửi HTTP → cập nhật outcome) nằm trong một transaction lớn, transaction sẽ bị giữ lock rất lâu, gây nghẽn database => tách riêng các thao tác transaction (markInFlight, updateOutcome, recordAttempt) để Fault isolation => cần compensate thủ công nếu job bị stuck do downstream unavailable.
-
-Dispatcher chậm trong lúc đang chờ HTTP response, sweeper/retry có thể đã đổi state sang RETRYING hoặc thậm chí DELIVERED => khi dispatcher quay lại gọi updateOutcome, hệ thống kiểm tra: nếu job không còn ở IN_FLIGHT, thì return null và không ghi đè
+Một luồng nữa cần chú ý là tính năng Bulk Replay cho phép Admin can thiệp thủ công để gửi lại hàng loạt job (ví dụ sau khi merchant khắc phục xong sự cố server) -> có thể gọi API liên tục, chuyển trạng thái hàng ngàn job về  `PENDING` trong thời gian cực ngắn -> áp lực đột ngột lên DB (write load) và làm tràn hàng đợi của các Scheduler, có thể gây "bottleneck" cho các job mới đang phát sinh từ luồng thanh toán thực tế => cơ chế BulkReplayRateLimiter (in-memory per instance + key-by-identity)
 
 ---
 
@@ -130,15 +179,9 @@ PaymentSessionEventConsumer / RefundEventConsumer
   → EnvelopeProcessor.process(record, topic)
        → CanonicalEventMapper.toCanonical(...)
        → CreateWebhookJobUseCase.apply(event)
+              → dedupStore.tryClaim("webhook-consumer-dedup:" + eventId, 24h)
+              → WebhookJob.create(...) → jobRepository.save(job, eventId)
 ```
-
-`CreateWebhookJobUseCase` (`application/CreateWebhookJobUseCase.java`):
-
-1. `dedupStore.tryClaim("webhook-consumer-dedup:" + eventId, 24h)`
-2. Lấy `merchantId` từ `event.data`
-3. `webhookConfigClient.get(merchantId)` — không URL → return
-4. `WebhookJob.create(...)` → `jobRepository.save(job, eventId)`  
-   - `DuplicateEventId` → skip idempotent
 
 - Dựa trên cấu trúc dự án, IPN service nhận sự kiện từ layer domain/infrastructure (có Kafka consumer, event mapper).
 - CanonicalEventMapper chuyển event nội bộ thành payload webhook chuẩn.
@@ -156,7 +199,7 @@ poll()  [ShedLock: pg-ipn-pending-dispatch, lockAtMostFor=2m]
   │
   └─ for each row: dispatchOne(row)
         │
-        ├─ inFlight = mutator.markInFlight(jobId, now)   // REQUIRES_NEW
+        ├─ inFlight = mutator.markInFlight(jobId, now)   // REQUIRES_NEW transaction
         │     fail OptimisticLockConflict → skip + metric skip_conflict
         │
         ├─ dispatcher.dispatch(inFlight)
@@ -166,7 +209,7 @@ poll()  [ShedLock: pg-ipn-pending-dispatch, lockAtMostFor=2m]
               → updateOutcome(..., PENDING, next_attempt_at=now)  // compensate
 ```
 
-**Độ trễ điển hình:** 0–5 giây sau persist (chu kỳ poll) + thời gian HTTP.
+**Độ trễ :** 0–5 giây sau persist (chu kỳ poll) + thời gian HTTP.
 
 - PATTERN: ShedLock → mutator claim → dispatcher → state machine → sweeper
   - ShedLock = “chỉ một pod chạy Pending poll (trong giới hạn thời gian lock)”.
@@ -202,51 +245,7 @@ InternalWebhookDeliveriesController có thể dùng cho nội bộ theo dõi, tr
 
 ---
 
-## 8. Race, ShedLock vs optimistic lock
-
-### Tại sao cần cả hai?
-
-| Lớp | Khóa | Giải quyết |
-|-----|------|------------|
-| ShedLock | Cả `poll()` | Hai pod cùng chạy Pending poll (hiếm / lock hết hạn) |
-| Optimistic | Từng `jobId` | Hai transaction cùng claim một row; stale snapshot |
-
-**Kịch bản ShedLock không đủ:**
-
-1. `lockAtMostFor=2m` hết trong khi batch 50 job × HTTP 10s  
-2. `PendingDispatchScheduler` và `RetryDispatchScheduler` **lock khác nhau** — chạy song song hợp lệ  
-3. `StuckJobSweeper` đổi state trong khi HTTP còn treo → `updateOutcome` return `null`  
-4. Admin `replay` đổi state giữa `findPendingDue` và `markInFlight`
-
-`OptimisticLockConflict` → log debug, metric `skip_conflict`, **tiếp tục job khác** — hành vi đúng.
-
-### Sơ đồ tư duy defense-in-depth
-
-```text
-         ┌──────────────┐
-         │   ShedLock   │  ← mutex scheduler (coarse)
-         └──────┬───────┘
-                ▼
-         ┌──────────────┐
-         │ markInFlight │  ← mutex row (fine, CAS)
-         └──────┬───────┘
-                ▼
-         ┌──────────────┐
-         │  Dispatcher  │  ← side-effect HTTP
-         └──────┬───────┘
-                ▼
-         ┌──────────────┐
-         │updateOutcome │  ← chỉ nếu còn IN_FLIGHT
-         └──────┬───────┘
-                ▼
-         ┌──────────────┐
-         │   Sweeper    │  ← lease reaper
-         └──────────────┘
-```
-
----
-
-## 9. Cấu hình vận hành
+## Cấu hình vận hành
 
 | Property | Default | Ý nghĩa |
 |----------|---------|---------|
