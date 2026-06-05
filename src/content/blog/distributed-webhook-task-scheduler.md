@@ -245,6 +245,100 @@ InternalWebhookDeliveriesController có thể dùng cho nội bộ theo dõi, tr
 
 ---
 
+## Bước ký (sign) webhook — bảo mật & secret rotation
+
+URL webhook của merchant nằm public trên internet — ai cũng có thể POST request giả tới. Nên mỗi webhook phải mang một **chữ ký** để merchant biết request thật từ gateway. Đây là bước 2 trong `WebhookDispatcher.dispatch` (giữa lấy URL và POST).
+
+Nhưng để có chữ ký thì trước hết hai bên phải **cùng có chung một secret**, ban đầu merchant phải tự setup ở dashboard (service: `merchant-service`): **Đặt URL webhook** + **Tạo secret** (quyền `MERCHANT_ADMIN`/`MERCHANT_DEVELOPER`). Server sinh một chuỗi ngẫu nhiên mạnh:
+
+```whsec_<43 ký tự base64url>      ← 32 byte ngẫu nhiên từ SecureRandom, vd whsec_8Kx...9aQ```. 
+
+Chuỗi plaintext này **chỉ trả về đúng một lần** trong HTTP response (201). Merchant phải copy lưu ngay vào config phía họ — mất là phải rotate cái mới.
+
+**server lưu secret thế nào?**: server **không lưu plaintext**. Nó lưu:
+
+| Bản lưu | Cách tạo | Dùng để |
+|---------|----------|---------|
+| **Hash** (`webhookSecretHash`) | `ApiKeyHasher.hash` — một chiều, không đảo ngược | audit / hiển thị legacy |
+| **Mã hoá** (`webhookSecretEncrypted`) | `ApiSecretCipher.encrypt` — **đảo ngược được** | giải mã ra plaintext để **ký** webhook |
+| **Prefix** (`webhookSecretPrefix`) | 12 ký tự đầu, vd `whsec_8Kx123` | hiển thị "secret nào đang dùng" cho UI/log |
+
+Lưu **mã hoá** (reversible) chứ không chỉ hash như mật khẩu? Vì khác với verify mật khẩu (chỉ cần so hash), **ký webhook cần lấy lại đúng giá trị secret gốc** để chạy HMAC. Nên secret phải mã hoá (giải mã được bằng khoá của hệ thống) thay vì băm một chiều.
+
+Sau bước này, **cùng một secret tồn tại ở 2 nơi**: merchant giữ plaintext (config của họ), gateway giữ bản mã hoá (giải ra khi cần ký). Đó là "shared secret" làm nền cho mọi chữ ký về sau.
+
+Chữ ký = `HMAC-SHA256(secret, timestamp + "." + payloadBody)`, secret chỉ gateway và merchant biết HMAC-SHA256 là cách biến secret đó thành chữ ký. Tách 2 phần:
+
+- **SHA-256** = hàm băm (hash): nhét vào chuỗi bất kỳ dài bao nhiêu cũng ra **64 ký tự hex cố định**. Hai tính chất: (1) **một chiều** — từ output không suy ngược ra input; (2) **nhạy** — đổi 1 ký tự input thì output đổi hoàn toàn. Nhưng SHA-256 trần thì *ai cũng tính được* → không chứng minh được danh tính.
+
+- **HMAC** = trộn thêm **secret** vào quá trình băm, biến hash "ai cũng tính" thành "chỉ ai có secret mới tính đúng". Công thức (đơn giản hoá): ``` HMAC(secret, msg) = SHA256( (secret ⊕ opad) + SHA256( (secret ⊕ ipad) + msg ) ) ```
+
+Chặn 3 thứ:
+- **Giả mạo:** không có secret thì không ký đúng → verify fail.
+- **Sửa payload:** đổi 1 byte → chữ ký lệch → lộ ngay.
+- **Phát lại:** `timestamp` nằm trong phần ký, merchant từ chối nếu quá cũ; thêm `X-Idempotency-Key = jobId` để bỏ bản trùng.
+
+Tính hiệu quả:
+
+- **Cùng input + cùng secret → luôn ra cùng chữ ký**, nên 2 bên tính ra giống hệt.
+- **Không có secret → không đoán nổi chữ ký** (vét cạn 2²⁵⁶ khả năng — bất khả thi).
+- **Đối xứng**: cả 2 dùng **chung 1 secret** (khác chữ ký số RSA khoá riêng/công khai). Đủ dùng vì gateway và merchant tin nhau, chỉ cần chống bên thứ ba.
+
+### Secret tập trung ở merchant-service
+
+pg-ipn-service **không giữ secret**. Secret lưu mã hoá ở `merchant-service`; pg-ipn-service gửi payload qua nhờ ký rồi nhận lại chữ ký:
+
+```text
+WebhookDispatcher (pg-ipn-service)  — KHÔNG giữ secret
+   │  POST /api/internal/merchants/{merchantId}/webhook/sign  { timestamp, payloadBody }
+   ▼
+merchant-service  — giữ secret (mã hoá), tự ký
+   │  v1     = HMAC-SHA256(secret hiện tại, timestamp + "." + payloadBody)
+   │  v1Prev = HMAC-SHA256(secret cũ,       ...)   ← chỉ khi đang rotate
+   ▼
+SignResponse { v1, v1Prev, secretPrefix, previousSecretPrefix, rotationActive }
+```
+
+Secret ở một nơi duy nhất → dễ audit/rotate, và pg-ipn-service bị hack cũng không lộ secret merchant.
+
+### Chuỗi ký & header
+
+Ký chuỗi `timestamp + "." + payloadBody` (`timestamp = now.getEpochSecond()`). **Cùng timestamp đó** gắn vào header để merchant dựng lại đúng chuỗi mà verify. Header (`buildSignatureHeader`):
+
+```
+X-Webhook-Signature: t=<timestamp>,v1=<hex>[,v1_prev=<hex>]
+```
+
+### Rotation — đổi secret không rớt webhook
+
+Đổi secret tức thời sẽ làm merchant chưa kịp cập nhật config verify fail → mất webhook. Giải pháp: (`rotationActive = true`) ký cả 2 secret — mới ra `v1`, cũ ra `v1_prev`. Merchant verify bằng secret cũ **hoặc** mới đều được → không downtime. Hết 24h → chỉ còn `v1`.
+
+(`secretPrefix`/`previousSecretPrefix` = vài ký tự đầu, chỉ để log audit, không phải vật liệu ký.)
+
+### Không cache
+
+Chữ ký tính per-payload (body khác → chữ ký khác) nên cache vô dụng cho đường ký; cache secret còn rủi ro ký nhầm secret cũ sau rotation. Nên `RestMerchantWebhookSignClient` cố tình không cache.
+
+### Xử lí lỗi ở bước ký
+
+| Lỗi | merchant-service | Xử lý |
+|-----|------------------|-------|
+| `MerchantWebhookSignUnavailable` | 5xx / timeout / IO | **Transient** → re-throw, rollback claim `IN_FLIGHT` → `PENDING`/`RETRYING`, **không** tăng `attempt_count`, tick sau thử lại |
+| `MerchantWebhookSignNotConfigured` | 4xx (404 merchant lạ, 409 no_secret) | **Permanent** → `DLQ` + attempt `SIGN_FAILED` + DLQ alert (1 lần) |
+
+### DISPATCH box
+
+```text
+│ DISPATCH (side-effect)                                                      │
+│  WebhookDispatcher.dispatch(IN_FLIGHT job)                                  │
+│    → lấy URL → ký (merchant-service ký hộ, secret không rời) → POST         │
+│      header X-Webhook-Signature: t=..,v1=..[,v1_prev=..]                    │
+│    → recordAttempt + updateOutcome (+ recordDlq nếu terminal)               │
+│    ký lỗi 5xx → rollback claim, thử lại  |  ký lỗi 4xx → DLQ                │
+```
+
+---
+
 ## Cấu hình vận hành
 
 | Property | Default | Ý nghĩa |

@@ -45,15 +45,9 @@
   font-size: 1.35rem;
   margin-top: 1.9em;
   margin-bottom: 0.5em;
-  padding-left: 0.6em;
-  border-left: 3px solid var(--border-strong);
-}
-
-.markdown-body h3::before {
-  content: "§ ";
+  padding-left: 0.55em;
+  border-left: 2px solid var(--accent);
   color: var(--accent);
-  font-weight: 600;
-  margin-right: 0.1em;
 }
 
 .markdown-body h4 {
