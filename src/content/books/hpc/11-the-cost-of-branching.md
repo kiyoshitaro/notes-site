@@ -20,8 +20,7 @@ useKatex: false
 
 1. Tại sao misprediction tốn ~15–20 cycles trên CPU hiện đại trong khi branch instruction chỉ 1 cycle?
 2. Cùng một vòng lặp `if (a[i] > 128)` chạy trên dữ liệu **đã sort** vs **random**: con số nào nhanh hơn và tại sao? Thay đổi định lượng thế nào nếu mảng có 10M phần tử với 50% giá trị > 128?
-3. Branch predictor học pattern thế nào? Pattern `T,T,T,T,...` (luôn taken) vs `T,N,T,N,...` (xen kẽ) — predictor có handle được không? Còn pattern random 50/50?
-4. `[[likely]]` và `__builtin_expect` ảnh hưởng đến code generation như thế nào? Compiler dùng hint để tối ưu cái gì cụ thể?
+3. `[[likely]]` và `__builtin_expect` ảnh hưởng đến code generation như thế nào? Compiler dùng hint để tối ưu cái gì cụ thể?
 
 ### Bài tập code
 
@@ -41,10 +40,7 @@ long count_above(const int* arr, int n, int threshold);
 1. **Pipeline flush**: CPU hiện đại có pipeline ~15–20 stages. Khi predict sai, mọi instruction đã fetch/decode/execute speculatively phải bị throw away → restart fetch từ đúng target. Cycles "mất" = số stages giữa fetch và resolution. Branch instruction đúng chỉ tốn 1 cycle vì predictor hit.
 
 2. Sorted nhanh hơn rõ rệt — predictor sau vài lần chạy sẽ học được "khi index < pivot luôn N, sau pivot luôn T" → near-100% hit rate. Random 50/50 → predictor không học được pattern → ~50% miss rate × 15 cycles/miss × 10M = ~75M cycles wasted (~25ms ở 3GHz). Sorted có thể nhanh hơn 3–5x trên benchmark cổ điển này (Stack Overflow 2012 — Mysticial).
-
-3. Pattern T,T,T,...: 2-bit saturating counter học sau ~2 lần. Pattern T,N,T,N,...: cần local history register (PHT indexed by pattern history) — modern predictors handle được. Pattern random: predictor stuck ở ~50% accuracy — không có pattern thì không học được. Đây chính là worst case.
-
-4. `[[likely]]` không thay branch instruction — predictor vẫn chạy. Tác dụng chính: **code layout** — compiler đặt fall-through path là likely branch (CPU prefetch cache line tiếp theo "free"), unlikely branch jump xa. Cũng ảnh hưởng register allocation — likely path được prioritized.
+3. `[[likely]]` không thay branch instruction — predictor vẫn chạy. Tác dụng chính: **code layout** — compiler đặt fall-through path là likely branch (CPU prefetch cache line tiếp theo "free"), unlikely branch jump xa. Cũng ảnh hưởng register allocation — likely path được prioritized.
 
 ### Bài tập code
 

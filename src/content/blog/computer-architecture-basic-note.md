@@ -282,6 +282,157 @@ Khi lưu số `0x12345678` (4 byte) tại địa chỉ `0x1000`:
   * **Context switch với thread**:
     * Gần giống process nhưng save/load register ít hơn, không phải reload lại heap, fd, không cần flush TLB => nhanh hơn process x2–5, tuy nhiên vẫn flush cache nên cache locality bị phá vỡ.
 
+#### "Everything is file" & tiến hóa I/O sync → async
+
+* **Triết lý Unix/Linux**: mọi thực thể I/O (file thường, socket mạng, pipe/FIFO, device như `/dev/null` `/dev/sda` `/dev/tty`, `/proc` `/sys`, `eventfd` `signalfd` `timerfd`, kể cả `epoll` instance...) đều trừu tượng thành **file** → app dùng cùng bộ syscall `open/read/write/close/ioctl` cho mọi loại I/O.
+  * Lợi: API thống nhất + composable (vd `cat a.txt | grep err > out.log` — pipe nối stdout↔stdin chỉ vì cả 2 đều "là file").
+  * Kernel implement qua **VFS (Virtual File System)** — lớp polymorphism: mỗi loại file gắn 1 bảng hàm `struct file_operations` (`.read`, `.write`, `.poll`, `.mmap`,...). Syscall `read(fd, ...)` → VFS gọi `file->f_op->read(...)` → driver/filesystem cụ thể xử lý.((VFS là design pattern "interface" ở tầng kernel. ext4, btrfs, NFS, procfs, tmpfs đều implement cùng interface → user code không cần biết file nằm trên loại storage nào.))
+
+* **File Descriptor (fd)**: số nguyên không âm app dùng để chỉ định tài nguyên I/O. Bản chất chỉ là **index** vào bảng fd của process trong kernel. Mặc định: `fd=0` stdin, `fd=1` stdout, `fd=2` stderr; từ 3 trở đi kernel cấp **số nhỏ nhất còn trống** khi `open()`/`socket()`/`pipe()`/`accept()`.
+
+##### 3 tầng quản lý file trong kernel
+
+* **Định nghĩa**: kernel quản lý file qua **3 tầng bảng nối tiếp**. App chỉ thấy 1 con số (fd), nhưng số đó đi qua 3 bảng mới đến dữ liệu thật. Mỗi tầng giải quyết 1 trách nhiệm khác nhau.
+
+* **Tầng 1 — Bảng fd của process**: là mảng riêng từng process. Index = số fd. Mỗi ô = con trỏ tới 1 dòng ở Tầng 2 để cô lập từng process — fd=3 của process A và fd=3 của process B là 2 ô khác nhau. **Lưu**: con trỏ + cờ phụ theo fd (vd `FD_CLOEXEC` = tự đóng khi `exec()`).
+
+* **Tầng 2 — Bảng lượt mở file (system-wide)**: 1 bảng chung cho toàn hệ thống. Mỗi lần `open()`/`socket()`/`pipe()` thành công → thêm **1 dòng mới** để nhiều process có thể cùng trỏ vào 1 dòng (qua `fork()` hoặc `dup()`) và **share offset**
+  * **Lưu**:
+    - **Vị trí đọc/ghi hiện tại** (offset) — đọc đến byte thứ bao nhiêu.
+    - **Chế độ truy cập**: đọc/ghi/append/non-blocking.
+    - **Ref count**: bao nhiêu fd đang trỏ vào dòng này. Về 0 thì kernel xóa dòng.
+
+* **Tầng 3 — Bảng inode (1 file vật lý = 1 inode)**: metadata + định vị dữ liệu thật của file trên đĩa/thiết bị.
+  * **Lưu**: size, permission, timestamp, type (regular/socket/pipe/device), danh sách disk block (file thường) hoặc driver functions (socket/device).
+
+* **Vì sao tách 3 tầng?**
+  * Nếu fd trỏ thẳng inode (Tầng 3) → mọi process cùng đọc 1 file dùng chung offset → người này đọc byte 100 thì người kia nhảy theo → loạn.
+  * Nếu fd trỏ thẳng disk block → app phải biết file nằm block nào → mất isolation + không share được.
+  * Tầng 2 ở giữa tách **trạng thái lượt mở** (offset, mode) khỏi **thực thể vật lý** (inode). Tầng 1 tách **không gian fd** theo process để cô lập.
+
+##### Luồng thực tế 1: 2 cửa sổ `vim` cùng mở `/etc/hosts`
+
+```
+       vim-A                              vim-B
+       fd table                           fd table
+       [3] ──┐                            [3] ──┐
+             ▼                                  ▼
+   ┌────────────────────┐           ┌────────────────────┐
+   │ Lượt mượn #71      │           │ Lượt mượn #88      │   ← Tầng 2
+   │ f_pos = 0          │           │ f_pos = 1024       │
+   │ chế độ = đọc+ghi   │           │ chế độ = chỉ đọc   │
+   │ ref count = 1      │           │ ref count = 1      │
+   └─────────┬──────────┘           └─────────┬──────────┘
+             │                                │
+             └───────────────┬────────────────┘
+                             ▼
+                  ┌──────────────────────┐
+                  │ Sách: /etc/hosts     │   ← Tầng 3 (1 inode duy nhất)
+                  │ size=512, perm=644   │
+                  │ block list=[...]     │
+                  └──────────────────────┘
+```
+
+* Vim-A scroll xuống → "f_pos" của **lượt #71** tăng.
+* Vim-B đọc đầu file → "f_pos" của **lượt #88** vẫn 1024. **Không ảnh hưởng nhau** vì offset nằm ở Tầng 2, mỗi process 1 dòng riêng.
+* Nhưng nếu Vim-A `:w` (ghi) → sách Tầng 3 đổi → Vim-B đọc tiếp sẽ thấy nội dung mới (vì cùng inode). Đây là lý do editor hiện cảnh báo "file changed on disk".
+
+##### Luồng thực tế 2: `fork()` — chia sẻ vị trí ghi log
+
+Shell mở file log với fd=3, rồi `fork()`:
+
+```
+Trước fork():                       Sau fork():
+parent [3] ──┐                      parent [3] ──┐
+             ▼                                   ▼
+    ┌─────────────────┐                ┌─────────────────┐
+    │ Lượt mượn #50   │                │ Lượt mượn #50   │  ← CÙNG 1 dòng
+    │ vị trí = 200    │                │ vị trí = 200    │
+    │ ref count = 1   │                │ ref count = 2   │  ← +1 vì child
+    └─────────────────┘                └─────────────────┘
+                                                ▲
+                                       child [3]┘
+```
+
+* Parent ghi `"hello\n"` → vị trí 200 → 206.
+* Child ghi tiếp `"world\n"` → vị trí 206 → 212 (**không đè 200→206**).
+* ==> Đây là lý do `>>` append trong shell hoạt động đúng khi nhiều process cùng ghi 1 log: chúng share **vị trí ghi** ở Tầng 2.
+
+So sánh với 2 lần `open()` riêng (vd 2 process độc lập): mỗi lần open tạo **dòng mới** ở Tầng 2 → vị trí độc lập → ghi đè lên nhau nếu không bật `O_APPEND`.
+
+##### Luồng thực tế 3: pipe `cat a.txt | grep err`
+
+* **Ý tưởng**: shell nối **stdout của `cat`** vào **stdin của `grep`** qua 1 buffer trong RAM. Hai process tưởng đang ghi/đọc file, thực ra đang ghi/đọc cùng 1 ống đệm.
+
+* **Cơ chế**: `pipe()` tạo 2 đầu (đầu ghi + đầu đọc) chia sẻ 1 buffer. Shell `dup2` đầu ghi vào fd=1 của `cat`, đầu đọc vào fd=0 của `grep` → 2 process không cần biết về pipe, chỉ cần "ghi stdout" và "đọc stdin" như bình thường.
+
+```
+   cat                              grep
+   stdout (fd=1) ──┐                stdin (fd=0) ──┐
+                   ▼                                ▼
+            ┌─────────────┐               ┌─────────────┐
+            │ Đầu ghi     │               │ Đầu đọc     │   ← Tầng 2
+            └──────┬──────┘               └──────┬──────┘
+                   │                             │
+                   └──────────► [ buffer RAM ] ◄─┘
+                                (~64KB, không qua disk)
+```
+
+* **Khi pipe đầy**: `cat write()` block → kernel chờ `grep` đọc bớt → back-pressure tự động.
+
+* **==>**: shell composability chỉ là **chuyển con trỏ ở Tầng 1** của 2 process trỏ vào 2 đầu của cùng 1 buffer Tầng 2. Không có file trên disk, không có socket, không có code riêng cho pipe trong `cat`/`grep` — vì *pipe cũng là file*.
+
+##### Hệ quả
+
+* **`fork()` xong `close()` trong child không làm cha mất fd**: chỉ giảm ref count ở Tầng 2 chứ không xóa dòng.
+* **`dup()`/`dup2()`** = tạo fd mới (Tầng 1) trỏ **cùng** dòng (Tầng 2) → chia sẻ vị trí. Khác với `open()` lại cùng file → tạo dòng mới, vị trí riêng.
+* **fd leak**: app quên `close()` → dòng Tầng 2 không free → cạn fd (mặc định `ulimit -n` ~1024–65536) hoặc cạn dòng toàn hệ thống (`/proc/sys/fs/file-max`).
+* **Process A `fd=3` và Process B `fd=3` không xung đột** — vì Tầng 1 cô lập theo process, cùng số fd nhưng trỏ 2 dòng khác nhau (hoặc thậm chí cùng 1 dòng nếu kế thừa qua `fork`).
+
+##### Tiến hóa Sync → Async: giấu I/O latency
+
+* **Vấn đề gốc**: I/O chậm hơn CPU ~10⁶ lần (disk ms, network 10–100ms vs CPU ns). Trong lúc đợi I/O, CPU **rảnh** nhưng thread bị **khóa** → lãng phí. Mỗi thế hệ giải pháp = giảm thêm 1 lớp lãng phí: thread block → syscall → copy → context switch.
+
+* **Giai đoạn 1 — Blocking I/O**: *1 connection = 1 thread*.
+  * App gọi `read()` → thread ngủ đến khi có data => muốn phục vụ N conn → cần N thread. ((Mỗi thread ~8MB stack + chi phí scheduler → 10k conn = 80GB RAM + context switch storm. Không scale.C10K problem (Dan Kegel, 1999): bài toán phục vụ 10k conn đồng thời — chính là động lực sinh ra epoll/kqueue.))
+
+* **Giai đoạn 2 — I/O multiplexing**: *1 thread quản N conn, kernel báo cái nào sẵn sàng*.
+  * Mở `O_NONBLOCK` → `read()` trả `EAGAIN` ngay nếu chưa có data (không block). Nhưng nếu app tự loop hỏi từng fd → tốn CPU. Cần **kernel làm hộ việc theo dõi**.
+
+  * **`select` / `poll`** (gọi 1 lần hỏi N fd):
+    * App đưa **danh sách fd** vào kernel → kernel duyệt **từng cái** xem có ready không → trả về danh sách "ready".
+    * 3 chi phí cố hữu:
+      1. **Copy cả danh sách vào kernel mỗi lần gọi** (app ↔ kernel).
+      2. **Quét O(n)** dù chỉ 1 fd ready.
+      3. `select` còn giới hạn cứng `FD_SETSIZE=1024`; `poll` bỏ giới hạn nhưng 2 vấn đề kia vẫn còn.
+
+  * **`epoll`** (Linux 2.6) / **`kqueue`** (BSD/macOS) — fix cả 3:
+    * **Đăng ký 1 lần, dùng nhiều lần**: `epoll_ctl(ADD)` đưa fd vào 1 cấu trúc nội bộ kernel (Red-Black tree) → không copy lại danh sách mỗi gọi.
+    * **Kernel chủ động báo**: khi data đến (vd packet ở NIC), driver gọi callback đẩy fd vào **ready list**. `epoll_wait` chỉ trả về list này → **O(fd ready)**, không O(tổng fd).
+    * **2 chế độ trigger**:
+      - **Level-triggered** (mặc định): còn data thì còn báo → an toàn, dễ code.
+      - **Edge-triggered** (`EPOLLET`): chỉ báo *khi trạng thái đổi* → app phải đọc đến `EAGAIN` mới dừng; ít wakeup, dùng cho high-perf.
+    * ==> Nginx, Node.js, Redis, Envoy đều dựa epoll.
+
+  * **Vẫn chưa phải "true async"**: epoll báo "fd sẵn sàng" → app **vẫn phải tự gọi `read()`** để move data → vẫn syscall, vẫn copy kernel↔user. Mô hình này gọi là **readiness-based** (báo sẵn sàng — app tự lấy).
+
+* **Giai đoạn 3 — True async (`io_uring`, Linux 5.1, 2019)**: *app đặt hàng, kernel làm xong, app nhặt kết quả*.
+  * Đảo mô hình: thay "kernel báo sẵn sàng, app tự đọc" → **completion-based**: app submit op → kernel tự đọc/ghi → kernel báo kết quả khi xong.
+  * Cơ chế: io_uring xây dựng 2 queue trong **bộ nhớ chia sẻ** giữa user và kernel (mmap):
+    - **SQ (Submission Queue)** — app ghi op vào (read fd này, gửi buf kia,...).
+    - **CQ (Completion Queue)** — kernel ghi kết quả ra.
+  * Vì ring chung memory → app **không cần syscall** để đặt op/lấy kết quả; chỉ 1 syscall `io_uring_enter` để wake kernel khi có op mới — và có thể **skip cả nó** với `SQPOLL` (kernel thread tự poll SQ liên tục).
+  * Tác dụng: link nhiều op (accept → recv → send chạy liền không cần wake user), registered buffers (DMA thẳng — zero-copy), unified cho cả disk + network + filesystem ops.
+  * ==> Latency sub-microsecond; 5–10M IOPS so với ~1–2M của epoll+read.((Jens Axboe (LWN 2019): "io_uring is designed to provide an interface for the application to perform IO without ever needing to enter the kernel by way of syscalls in the fast path." Với SQPOLL, app gửi triệu op mà 0 syscall.))
+  * Chi tiết network: xem mục **I/O Network → io_uring** bên dưới.
+
+* **Tóm tắt**:
+  * **Blocking**: app đợi → kernel làm → app nhận. *N conn → N thread.*
+  * **`select`/`poll`**: app hỏi "có cái nào ready không?" → kernel quét hết → trả về list -> app tự đọc list đó. *O(n) mỗi lần.*
+  * **`epoll`**: app đăng ký 1 lần → kernel **gọi lại app** khi có sự kiện. *O(ready)* -> app vẫn phải tự đọc
+  * **`io_uring`**: app đặt op vào ring → kernel làm xong, ghi kết quả ra ring (shared memory - mmap). *0 syscall fast-path.*
+* Mục đích: **xóa nhòa boundary user/kernel trong hot path** — chỉ giữ lại đúng phần kernel cần làm (đọc thiết bị, copy DMA), bỏ hết overhead trung gian.
+
 #### Disk access (via file)
 
 * **Khởi tạo yêu cầu**:

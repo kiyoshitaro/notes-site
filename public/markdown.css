@@ -1,10 +1,11 @@
 /* markdown.css */
 .markdown-body {
-  font-family: var(--font-mono);
-  color: var(--fg);
+  /* font-family: 'Merriweather', serif; */
+  font-family: 'Lora', serif;
+  /* font-family: Georgia, serif; */
   background: transparent;
-  line-height: 1.7;
-  font-size: 1.05rem;
+  /* line-height: 1.7; */
+  /* font-size: 1.05rem; */
   --media-max-width: 720px;
 }
 
