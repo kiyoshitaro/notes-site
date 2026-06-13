@@ -1,7 +1,15 @@
-# Profiling trong Go 
-> Tài liệu này tổng hợp tư duy và kỹ thuật profiling Go, dựa trên hai chương trình ví dụ `wc` và `mandelbrot`.
-
 ---
+title: "Go Profiling"
+pubDate: "2026-02-12"
+published: true
+contents_table: true
+pinned: false
+description: "Kỹ thuật profiling cơ bản trong Go"
+cat: "golang"
+useKatex: false
+---
+
+# Profiling trong Go 
 
 ## 1. Measure, don't guess
 
