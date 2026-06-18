@@ -100,35 +100,6 @@ useKatex: false
 
 * **Interrupt**: yêu cầu CPU ngắt dòng lệnh hiện tại và nhảy vào chạy Interrupt Handler (do kernel định nghĩa): I/O interrupt, Disk interrupt.
 
-#### Process: a running program, machine state compose of
-
-* **Composition**:
-  * Memory
-  * Registers: Instruction pointer (RIP), stack pointer (RSP), frame/base pointer (RBP)
-  * I/O info: open file descriptor
-  * ==> show in `/proc/pid/status` or `fd`
-
-* **API**:
-  * Create: `fork()`, `exec()`, `clone()`
-  * Destroy: `kill(pid, SIGTERM)`
-  * Wait
-  * Miscellaneous Control
-  * Status: `cat /proc/pid/status`
-
-* **Creation**:
-  * Load program code/static data (lazily) to mem, to address space of process.
-  * Run-time stack allocated: init stack with `argc`/`argv` array of main.
-  * Heap is created (lazily).
-  * I/O setup: default 3 FD (STD in/out/err).
-  * Start program running at entrypoint: `main()` then OS transfer control to CPU.
-
-* **States**:
-  * Running: instructions are being executed.
-  * Ready: for some reason OS chose not to run at this moment.
-  * Blocked: perform some operation (I/O) and waiting for result.
-
-![Process States](/public/assets/process_states.png)
-
 #### Hyper-Threading: cho phép CPU chạy hai luồng (threads) trên cùng một lõi vật lý bằng cách
 
 * Tạo hai bộ thanh ghi riêng: Mỗi luồng có bộ thanh ghi riêng để lưu trạng thái (dữ liệu, lệnh) của nó.
@@ -179,7 +150,7 @@ Khi lưu số `0x12345678` (4 byte) tại địa chỉ `0x1000`:
 
 > Warning: **Bug điển hình**: cast `int*` sang `char*` rồi đọc byte đầu — kết quả khác nhau giữa LE và BE.
 
-#### Bản chất cần nhớ
+#### Bản chất
 
 * RAM = **mảng byte có địa chỉ**, đứng sau là **mảng tụ điện cần refresh**.
 * CPU **không đọc 1 byte** — luôn kéo cả **cache line 64 byte**.
