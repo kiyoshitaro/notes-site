@@ -250,9 +250,9 @@ Khi lưu số `0x12345678` (4 byte) tại địa chỉ `0x1000`:
     * Nếu trang ở RAM (page hit): Lấy và nạp data từ RAM vào cache.
       * Nếu địa chỉ ảo liên tiếp (`arr[0]`, `arr[1]`, `arr[2]`...) → địa chỉ vật lý thường gần nhau (spatial locality) → dễ nằm trong cùng cache line.
     * Nếu trang không ở RAM (page fault): CPU gửi interrupt đến OS.
-  * OS xử lý page fault:
-    * OS tìm page trên disk, load vào RAM (nếu RAM đầy, Page Replacement Algorithms: LRU, …).
-    * Cập nhật page table & CPU tiếp tục thực hiện.
+      * OS xử lý page fault:
+        * OS tìm page trên disk (hoặc mmap file), load vào RAM (nếu RAM đầy, Page Replacement Algorithms: LRU, … Swap out chúng xuống một phân vùng trên ổ cứng (Swap Space) để lấy chỗ trống).
+        * Cập nhật page table & CPU tiếp tục thực hiện.
 
 #### CPU virtualization & scheduler → MULTITASK
 
@@ -918,3 +918,105 @@ So sánh với 2 lần `open()` riêng (vd 2 process độc lập): mỗi lần 
     * Duyệt theo hàng (row): `for i: for j: use(a[i][j])` → truy cập `a[i][0..n-1]` liên tiếp, cache line được tận dụng tối đa.
     * Duyệt theo cột (column): `for j: for i: use(a[i][j])` → giữa hai phần tử liên tiếp phải nhảy qua `stride` lớn trong memory → mỗi bước rất dễ rơi vào line khác nhau → nhiều cache miss.
   * Quy tắc: **truy cập theo thứ tự layout vật lý** của dữ liệu trong RAM → tận dụng spatial locality.
+
+
+---
+
+### Ảo hóa (Virtualization)
+
+#### Bài toán gốc: tại sao cần ảo hóa
+
+* Từ đầu bài đã thấy OS làm **ảo hóa cho process**: mỗi process tưởng mình **độc chiếm CPU** (nhờ time-sharing + context switch) và **độc chiếm RAM** (nhờ virtual address space + MMU/paging). Đó đã là một tầng ảo hóa — nhưng tất cả process **dùng chung 1 kernel**.
+* Vấn đề thực tế đẩy nhu cầu lên cao hơn:
+  * **Tận dụng phần cứng**: 1 server vật lý mạnh (nhiều core, hàng trăm GB RAM) mà chỉ chạy 1 app → lãng phí. Muốn nhồi nhiều workload độc lập lên cùng 1 máy.
+  * **Cách ly (isolation)**: nhiều khách hàng (multi-tenant), nhiều app version, nhiều OS khác nhau → không được giẫm chân nhau (bảo mật, sự cố, tài nguyên).
+  * **Tính di động (portability) + tái lập (reproducibility)**: "chạy được trên máy tôi" phải chạy được mọi nơi → đóng gói cả môi trường.
+* **Ý tưởng cốt lõi**: ảo hóa = tạo **một tầng gián tiếp (indirection)** cho tài nguyên thật, rồi **chia + cách ly** tài nguyên đó cho nhiều "khách" tưởng mình sở hữu toàn bộ. Giống hệt cách MMU ảo hóa RAM, chỉ khác **mức độ ảo hóa cái gì**.
+
+#### Phổ ảo hóa: từ nặng đến nhẹ (trade-off isolation ↔ overhead)
+
+Trục xuyên suốt: **ảo hóa càng thấp tầng (gần phần cứng) → cách ly càng mạnh thì overhead càng lớn**. Đây là cùng một trade-off như "Limited Direct Execution" ở phần CPU — càng để client chạy trực tiếp trên phần cứng thật càng nhanh, thì càng khó kiểm soát.
+
+```text
+Cách ly mạnh ↑                                          Overhead lớn ↑
+(boundary = phần cứng)                                  (boot chậm, RAM tốn)
+┌───────────────────────────────────────────────────────────────────┐
+│  Máy vật lý riêng     │ ảo hóa cái gì?      │ chia sẻ cái gì?       │
+│ ───────────────────── │ ─────────────────── │ ───────────────────── │
+│  VM (KVM/QEMU, VMware)│ TOÀN BỘ phần cứng   │ chỉ chia phần cứng    │
+│                       │ (CPU, RAM, NIC, disk)│ → mỗi VM có kernel RIÊNG│
+│  ─────────────────────│ ─────────────────── │ ───────────────────── │
+│  microVM (Firecracker)│ phần cứng tối giản  │ kernel riêng + ít device│
+│  ─────────────────────│ ─────────────────── │ ───────────────────── │
+│  Sandbox (gVisor/Kata)│ syscall / kernel-lite│ kernel host gián tiếp │
+│  ─────────────────────│ ─────────────────── │ ───────────────────── │
+│  Container (Docker)   │ GÓC NHÌN của OS     │ DÙNG CHUNG kernel host │
+│                       │ (namespaces+cgroups) │ → chỉ là process bị nhốt│
+│  ─────────────────────│ ─────────────────── │ ───────────────────── │
+│  Process thường       │ CPU + RAM (sẵn có)  │ kernel + mọi namespace │
+└───────────────────────────────────────────────────────────────────┘
+Cách ly yếu ↓                                          Overhead nhỏ ↓
+```
+
+* **VM**: ảo hóa **cả cỗ máy** → client là một **OS hoàn chỉnh có kernel riêng**. Boundary cách ly nằm ở **phần cứng ảo** → rất chắc, nhưng tốn (mỗi VM gánh nguyên 1 kernel + RAM + boot).
+* **Container**: **không ảo hóa phần cứng**, chỉ ảo hóa **góc nhìn của process về OS** → tất cả container **dùng chung kernel host**. Bản chất chỉ là **process bị nhốt** → nhẹ gần như native, nhưng boundary cách ly là **kernel host** (mỏng hơn).
+
+#### Bản chất Container (Docker) — ảo hóa góc nhìn OS, chia sẻ kernel
+
+> **Container KHÔNG phải máy ảo nhẹ. Container chỉ là một process Linux bình thường, bị nhốt bằng 3 cơ chế kernel: namespaces (thấy gì) + cgroups (dùng được bao nhiêu) + overlayfs (filesystem).** Không có guest kernel, không có VMExit, không VT-x.
+
+* Vì dùng chung kernel host → **chạy `ps` trên host vẫn thấy process của container** (chỉ là nó bị đổi PID + ẩn bớt). Container "khởi động" = `fork/exec` một process rồi gắn các namespace → **mili-giây**, không boot OS.
+
+##### Namespaces — ảo hóa "process thấy cái gì" (isolation của góc nhìn)
+
+Mỗi namespace ảo hóa **một loại tài nguyên hệ thống**, cho process một **góc nhìn riêng**:
+
+| Namespace | Ảo hóa cái gì | Hệ quả |
+|---|---|---|
+| **PID** | cây tiến trình | process trong container thấy mình là **PID 1**, không thấy process host |
+| **NET** | network stack | có `eth0`, routing, iptables, port **riêng** — tách hẳn host |
+| **MNT** | cây mount/filesystem | có root filesystem riêng (kế thừa ý tưởng `chroot` nhưng mạnh hơn) |
+| **UTS** | hostname, domain | đặt hostname riêng |
+| **IPC** | shared mem, semaphore | không thấy IPC của container khác |
+| **USER** | map UID/GID | **UID 0 (root) trong container = UID thường ngoài host** → rootless, an toàn hơn |
+| **CGROUP** | view của cây cgroup | ẩn cấu trúc cgroup host |
+
+* Bản chất kỹ thuật: chỉ là **3 syscall** — `clone()`/`unshare()` (tạo namespace mới) + `setns()` (gắn vào namespace có sẵn). `docker exec` vào container = `setns()` vào đúng bộ namespace của nó.
+
+##### cgroups — ảo hóa "process dùng được bao nhiêu" (resource limit)
+
+* **namespaces lo *thấy gì*, cgroups lo *dùng bao nhiêu*** — hai trục độc lập, ghép lại mới thành container.
+* cgroups (control groups) giới hạn + đo đếm tài nguyên theo nhóm process:
+  * **CPU**: `cpu.max` (quota/period — vd 50ms mỗi 100ms = 0.5 core), `cpu.weight` (chia tỉ lệ khi tranh chấp). Bản chất là **cài tham số cho CFS scheduler** ở phần trên.
+  * **Memory**: `memory.max` — vượt → **OOM killer** giết process trong nhóm (không đụng host).
+  * **I/O**: `io.max` — giới hạn IOPS/bandwidth đĩa (qua blk-cgroup).
+  * **pids**: chặn fork-bomb.
+* ==> `docker run --cpus=2 --memory=4g` chỉ là **ghi vào file cgroup**.
+
+##### overlayfs — image phân lớp (layered filesystem)
+
+* Docker image gồm nhiều **lớp read-only** chồng lên nhau (mỗi dòng `Dockerfile` ≈ 1 lớp). Khi chạy, thêm 1 lớp **ghi (writable) mỏng** trên cùng:
+  * **Copy-on-Write**: đọc file → lấy từ lớp dưới; sửa file → **copy lên lớp writable rồi mới sửa** (lớp dưới bất biến).
+  * ==> Nhiều container share chung các lớp base (vd `ubuntu:22.04`) → **tiết kiệm disk + RAM page cache** (cùng file = cùng inode = cùng page cache, tái dùng cơ chế page cache ở phần I/O).
+* ==> Image **build 1 lần chạy mọi nơi**, pull chỉ tải lớp thiếu → đây là gốc của "portability + reproducibility".
+
+#### So sánh VM ↔ Container (cùng một trục trade-off)
+
+| Tiêu chí | VM (KVM/QEMU) | Container (Docker) |
+|---|---|---|
+| Ảo hóa cái gì | **toàn bộ phần cứng** | **góc nhìn OS** (namespaces+cgroups) |
+| Kernel | **riêng mỗi VM** | **chung kernel host** |
+| Boundary cách ly | phần cứng ảo + VT-x → **chắc** | syscall của kernel host → **mỏng hơn** |
+| Khởi động | giây (boot OS) | **mili-giây** (fork+exec) |
+| Overhead CPU/mem | VMExit + 2D paging + nguyên 1 kernel/VM | **gần native** (chỉ là process) |
+| Mật độ (density) | chục VM/host | **hàng trăm–nghìn container/host** |
+| Chạy OS khác kernel | **được** (Windows trên Linux host) | **không** (phải cùng kernel Linux) |
+| Dùng khi | multi-tenant không tin nhau, cần OS khác, cách ly mạnh | microservice, CI/CD, mật độ cao, cùng OS |
+
+* ==> Không phải "cái nào tốt hơn" mà là **chọn điểm trên phổ isolation↔overhead** theo bài toán. Thực tế hay **xếp chồng**: VM (cách ly hạ tầng giữa các tenant) **bên trong chạy nhiều container** (mật độ + triển khai nhanh) — đúng mô hình cloud (EC2 VM → trong đó là pod/container).
+
+#### Kết luận (xuyên suốt phổ ảo hóa)
+
+* **Ảo hóa = thêm tầng gián tiếp rồi chia + cách ly tài nguyên** — cùng một ý tưởng từ MMU (ảo hóa RAM) → process (ảo hóa CPU) → container (ảo hóa OS view) → VM (ảo hóa cả máy). Khác nhau ở **ảo hóa tới mức nào**.
+* **Một trục trade-off duy nhất**: cách ly mạnh ↔ overhead nhỏ. VM, microVM, sandbox, container chỉ là **các điểm khác nhau trên cùng trục đó**.
+* **Container không nhẹ vì "ảo hóa giỏi hơn" — nó nhẹ vì KHÔNG ảo hóa phần cứng**, chỉ mượn lại namespaces + cgroups + overlayfs sẵn có trong kernel. VM nặng vì gánh **nguyên một kernel + 2D paging + VMExit** để đổi lấy cách ly cứng.
