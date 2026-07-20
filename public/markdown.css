@@ -107,6 +107,31 @@
   overflow-wrap: break-word;
 }
 
+/* Mermaid diagrams: a plain, centered container (no code-box chrome). */
+.markdown-body pre.mermaid {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 1.75em 0;
+  text-align: center;
+  line-height: normal;
+  overflow-x: auto;
+  white-space: normal;
+}
+
+/* Hide the raw diagram source until mermaid has rendered, to avoid a flash of
+   unstyled text. mermaid sets data-processed="true" once the <svg> is in place. */
+.markdown-body pre.mermaid:not([data-processed]) {
+  color: transparent;
+  min-height: 2.5em;
+}
+
+.markdown-body pre.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
 .markdown-body .expressive-code {
   margin: 1.5em 0;
 }

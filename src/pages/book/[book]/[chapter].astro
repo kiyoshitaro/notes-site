@@ -542,4 +542,9 @@ const siteUrl = new URL('/', Astro.site).toString();
     </div>
   </main>
   <script type="module" src={galleryScriptUrl}></script>
+  <script>
+    // Bundled by Astro (transpiles TS, resolves the mermaid npm import,
+    // and code-splits the dynamic import so it loads only on pages with diagrams).
+    import '../../../scripts/mermaid.ts';
+  </script>
 </Layout>

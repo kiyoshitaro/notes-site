@@ -692,6 +692,11 @@ article.post-plain :global(img[width]) {
   </div>
   <script type="module" src={galleryScriptUrl}></script>
   <script>
+    // Bundled by Astro (transpiles TS, resolves the mermaid npm import,
+    // and code-splits the dynamic import so it loads only on pages with diagrams).
+    import '../../scripts/mermaid.ts';
+  </script>
+  <script>
     const tocRail = document.getElementById('toc-rail');
     const tocToggle = document.querySelector('[data-toc-toggle]');
     const tocBackdrop = document.querySelector('[data-toc-backdrop]');

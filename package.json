@@ -19,6 +19,7 @@
     "astro-expressive-code": "^0.41.7",
     "astro-pagefind": "^1.8.6",
     "katex": "^0.16.22",
+    "mermaid": "^11.16.0",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
     "sharp": "^0.34.3"
