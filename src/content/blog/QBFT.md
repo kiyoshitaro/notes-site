@@ -6,8 +6,6 @@ description: "Consensus"
 useKatex: false
 ---
 
-# Nền tảng đồng thuận QBFT
-
 ## 1. Bài toán wCBDC
 
 Trong bài toán thiết kế wCBDC ledger, ta muốn nhiều máy chủ **cùng giữ một sổ cái** wCBDC, đặt rải ở các trung tâm dữ liệu, vì hai lý do rất thực tế:
@@ -17,14 +15,12 @@ Trong bài toán thiết kế wCBDC ledger, ta muốn nhiều máy chủ **cùng
 
 Từ hai mong muốn đó **một câu hỏi quyết định mọi thứ:**
 
-> **Cần bao nhiêu máy "đồng ý" thì một giao dịch mới được coi là XONG (chung cuộc)?**
+> **Cần bao nhiêu máy "đồng ý" thì một giao dịch mới được coi là XONG?**
 
 Con số đó gọi là **quorum**:
 
 - Đặt quorum **quá thấp** → khi mạng trục trặc, hai nhóm máy có thể chốt hai phiên bản sổ cái mâu thuẫn → **hai ngân hàng cùng tiêu một đồng wCBDC**.
 - Đặt quorum **quá cao** → chỉ cần rớt vài máy là **không bao giờ gom đủ phiếu** → cả hệ thống **treo cứng**, không giao dịch nào settle được.
-
-Cả tài liệu nói về "N=5, quorum=4, chịu lỗi f=1, fail-stop 2 DC" thực ra chỉ là **lời giải cho đúng câu hỏi này**. Phần dưới sẽ **đi từ câu hỏi tới con số**, không nhảy thẳng vào công thức.
 
 **Vì sao không để 1 máy quyết cho gọn?** Vì lúc đó ai chạy máy đó **một mình nắm chân lý** — đúng cái ta muốn tránh, và máy đó chết là chết cả hệ (SPOF). Nên buộc phải có **nhiều máy cùng bỏ phiếu**. Câu hỏi chỉ còn là: **bao nhiêu phiếu là đủ?** Muốn trả lời, trước hết phải biết **các máy có thể "hỏng" theo những kiểu nào.**
 
@@ -43,7 +39,7 @@ Trong thực tế vận hành, một validator có thể trục trặc theo **ha
 
 ---
 
-## 3. Hai tiêu chí phải giữ
+## 3. Tiêu chí
 
 - **Safety (an toàn):** không bao giờ hai block mâu thuẫn cùng đạt quorum. *(Không chi đôi, không đảo ngược giao dịch đã final.)*
 - **Liveness (sống):** vẫn gom đủ quorum để chốt **dù `f` máy đã chết**. *(Hệ không treo vĩnh viễn; giao dịch hợp lệ rồi cũng xong.)*
@@ -56,7 +52,7 @@ Gọi `N` = tổng validator, `q` = quorum (số chữ ký tối thiểu để c
 **(A) Safety** — hai quorum bất kỳ phải **giao nhau**, và vùng giao phải còn **ít nhất 1 node trung thực**:
 - Hai block, mỗi block `q` chữ ký → tổng `2q` chữ ký trên `N` node → vùng giao **≥ `2q − N`** node ký cả hai.
 - Trong vùng giao, kẻ dối nhiều nhất `f` → muốn còn ≥1 node trung thực: `2q − N ≥ f + 1` → **`q ≥ (N + f + 1) / 2`**.
-- Node trung thực **không bao giờ ký hai block mâu thuẫn** → nếu vùng giao luôn có node trung thực thì **không thể có hai block cùng đạt quorum**. ✅
+- Node trung thực **không bao giờ ký hai block mâu thuẫn** → nếu vùng giao luôn có node trung thực thì **không thể có hai block cùng đạt quorum**.
 
 **(B) Liveness** — phải gom đủ `q` từ số node còn sống khi `f` node chết: **`q ≤ N − f`**.
 
