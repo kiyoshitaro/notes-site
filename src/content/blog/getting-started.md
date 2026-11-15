@@ -78,6 +78,43 @@ __global__ void add(const float *a, const float *b, float *c) {
 }
 ```
 
+## Diagrams with Mermaid
+
+Write a fenced code block with the language `mermaid` and it renders as a diagram. Colors follow the site palette and redraw when you toggle light/dark. If the source has a syntax error, the raw text stays visible and the error is logged to the browser console.
+
+````md
+```mermaid
+flowchart TD
+  Host["Host (CPU)"] -->|cudaMemcpy| Global[("Global memory")]
+  Global --> L2["L2 cache"]
+  L2 --> SM1["SM 0<br/>shared memory + registers"]
+  L2 --> SM2["SM 1<br/>shared memory + registers"]
+  SM1 -.->|results| Global
+```
+````
+
+```mermaid
+flowchart TD
+  Host["Host (CPU)"] -->|cudaMemcpy| Global[("Global memory")]
+  Global --> L2["L2 cache"]
+  L2 --> SM1["SM 0<br/>shared memory + registers"]
+  L2 --> SM2["SM 1<br/>shared memory + registers"]
+  SM1 -.->|results| Global
+```
+
+Sequence diagrams work too. One gotcha: `;` ends a statement in Mermaid, so write `#59;` when you need a literal semicolon inside a message.
+
+```mermaid
+sequenceDiagram
+  participant H as Host
+  participant G as GPU
+  H->>G: Launch kernel (grid, block)
+  G->>G: Schedule warps on SMs
+  G-->>H: Kernel done#59; copy results back
+```
+
+Other diagram types (state, class, gantt, ER, …) are listed in the [Mermaid docs](https://mermaid.js.org/intro/).
+
 ## Further reading
 - [George Hotz - how do GPUs work?](https://youtu.be/OUzm06YaUsI) 
 - [George Hotz - can you multiply a matrix?](https://youtu.be/VgSQ1GOC86s) 

@@ -107,31 +107,6 @@
   overflow-wrap: break-word;
 }
 
-/* Mermaid diagrams: a plain, centered container (no code-box chrome). */
-.markdown-body pre.mermaid {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  margin: 1.75em 0;
-  text-align: center;
-  line-height: normal;
-  overflow-x: auto;
-  white-space: normal;
-}
-
-/* Hide the raw diagram source until mermaid has rendered, to avoid a flash of
-   unstyled text. mermaid sets data-processed="true" once the <svg> is in place. */
-.markdown-body pre.mermaid:not([data-processed]) {
-  color: transparent;
-  min-height: 2.5em;
-}
-
-.markdown-body pre.mermaid svg {
-  max-width: 100%;
-  height: auto;
-}
-
 .markdown-body .expressive-code {
   margin: 1.5em 0;
 }
@@ -646,4 +621,30 @@
   .sidenote-toggle:checked + .sidenote {
     display: block;
   }
+}
+
+/* Mermaid diagrams (scripts/remark-mermaid.mjs + src/scripts/mermaid-diagrams.ts) */
+.markdown-body .mermaid-diagram {
+  margin: 1.5em 0;
+  text-indent: 0;
+}
+
+.markdown-body .mermaid-diagram.is-rendered .mermaid-source {
+  display: none;
+}
+
+.markdown-body .mermaid-output {
+  overflow-x: auto;
+  text-align: center;
+}
+
+.markdown-body .mermaid-output svg {
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+/* Diagrams are already drawn with the dark palette, so skip the generic SVG invert. */
+:root[data-theme='dark'] .markdown-body .mermaid-output svg {
+  filter: none;
 }
