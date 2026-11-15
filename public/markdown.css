@@ -661,3 +661,29 @@
     display: block;
   }
 }
+
+/* Mermaid diagrams (scripts/remark-mermaid.mjs + src/scripts/mermaid-diagrams.ts) */
+.markdown-body .mermaid-diagram {
+  margin: 1.5em 0;
+  text-indent: 0;
+}
+
+.markdown-body .mermaid-diagram.is-rendered .mermaid-source {
+  display: none;
+}
+
+.markdown-body .mermaid-output {
+  overflow-x: auto;
+  text-align: center;
+}
+
+.markdown-body .mermaid-output svg {
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+/* Diagrams are already drawn with the dark palette, so skip the generic SVG invert. */
+:root[data-theme='dark'] .markdown-body .mermaid-output svg {
+  filter: none;
+}
