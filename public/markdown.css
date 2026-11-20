@@ -164,23 +164,12 @@
 .markdown-body .katex-display::-webkit-scrollbar-thumb:hover { background: var(--fg-subtle); }
 
 .markdown-body .md-table-wrap {
-  --table-right-bleed: 0px;
-  --table-base-width: calc(100% - var(--table-right-bleed));
   width: 100%;
-  margin: 0.7em 0;
+  margin: 1em 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) var(--surface-elev);
-}
-
-@media (min-width: 1024px) {
-  .markdown-body .md-table-wrap {
-    --table-edge-gap: calc(var(--side-gutter, 1rem) * 2);
-    --table-right-bleed: max(0px, calc((100vw - var(--content-max-width, 800px)) / 2 + var(--side-gutter, 1rem) - var(--table-edge-gap)));
-    width: calc(100% + var(--table-right-bleed));
-    max-width: calc(100vw - var(--table-edge-gap));
-  }
 }
 
 .markdown-body .md-table-wrap::-webkit-scrollbar { height: 8px; }
@@ -188,29 +177,37 @@
 .markdown-body .md-table-wrap::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; }
 .markdown-body .md-table-wrap::-webkit-scrollbar-thumb:hover { background: var(--fg-subtle); }
 
+/* Tables stay inside the text column: a small table is only as wide as its
+   content, a wordy one wraps its cells instead of running off to the right.
+   The wrapper scrolls sideways only when the columns cannot shrink further. */
 .markdown-body .md-table-wrap > table {
   border-collapse: collapse;
   margin: 0;
   background: none;
   color: inherit;
-  width: max-content;
-  min-width: var(--table-base-width);
+  width: auto;
+  max-width: 100%;
   table-layout: auto;
+  font-size: 0.93rem;
+  line-height: 1.5;
 }
 
 .markdown-body th, .markdown-body td {
-  padding: 0.4em 0.6em;
+  padding: 0.5em 0.8em;
   text-align: left;
+  vertical-align: top;
   border: none;
   background: none;
-  white-space: nowrap;
-  overflow: visible;
+  white-space: normal;
+  overflow-wrap: break-word;
+  min-width: 5.5em;
   width: auto;
 }
 
 .markdown-body th {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  vertical-align: bottom;
   border-bottom: 2px solid var(--border-strong);
   color: var(--fg-strong);
 }
@@ -235,20 +232,17 @@
     border-radius: 6px;
   }
 
-  .markdown-body .md-table-wrap > table {
-    min-width: 100%;
-  }
-
   .markdown-body th,
   .markdown-body td {
-    padding: 0.35em 0.5em;
+    padding: 0.4em 0.55em;
     font-size: 0.85rem;
+    min-width: 6.5em;
   }
 
   .markdown-body th:first-child,
-  .markdown-body td:first-child { padding-left: 0.5em; }
+  .markdown-body td:first-child { padding-left: 0.55em; }
   .markdown-body th:last-child,
-  .markdown-body td:last-child { padding-right: 0.5em; }
+  .markdown-body td:last-child { padding-right: 0.55em; }
 }
 
 .markdown-body blockquote {
